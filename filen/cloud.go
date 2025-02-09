@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/util"
 	"github.com/google/uuid"
-	"strings"
-	"time"
 )
 
 // File represents a file on the cloud drive.
@@ -83,7 +84,7 @@ func (filen *Filen) FindItem(path string, requireDirectory bool) (*File, *Direct
 
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
-		return nil, nil, errors.New(fmt.Sprintf("no segments in path %s", path))
+		return nil, nil, fmt.Errorf("no segments in path %s", path)
 	}
 
 	currentUUID := baseFolderUUID
