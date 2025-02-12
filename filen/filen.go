@@ -2,9 +2,10 @@
 package filen
 
 import (
+	"strings"
+
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
-	"strings"
 )
 
 // Filen provides the SDK interface. Needs to be initialized via [New].
@@ -17,6 +18,9 @@ type Filen struct {
 	// their password, a new master key is appended. For decryption, all master keys are tried
 	// until one works; for decryption, always use the latest master key.
 	MasterKeys [][]byte
+
+	// BaseFolderUUID is the UUID of the cloud drive's root directory
+	BaseFolderUUID string
 }
 
 // New creates a new Filen and initializes it with the given email and password
@@ -58,6 +62,13 @@ func New(email, password string) (*Filen, error) {
 	for _, key := range strings.Split(masterKeysStr, "|") {
 		filen.MasterKeys = append(filen.MasterKeys, []byte(key))
 	}
+
+	// fetch base folder UUID
+	userBaseFolder, err := filen.client.GetUserBaseFolder()
+	if err != nil {
+		return nil, err
+	}
+	filen.BaseFolderUUID = userBaseFolder.UUID
 
 	return filen, nil
 }

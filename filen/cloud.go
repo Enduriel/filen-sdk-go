@@ -39,25 +39,12 @@ type Directory struct {
 	Favorited  bool      // whether the directory is marked a favorite
 }
 
-// GetBaseFolderUUID fetches the UUID of the cloud drive's root directory.
-func (filen *Filen) GetBaseFolderUUID() (string, error) {
-	userBaseFolder, err := filen.client.GetUserBaseFolder()
-	if err != nil {
-		return "", err
-	}
-	return userBaseFolder.UUID, nil
-}
-
 // FindItemUUID finds a cloud item by its path and returns its UUID.
 // Returns an empty string if none was found.
 // Use this instead of FindItem to correctly handle paths pointing to the base directory.
 func (filen *Filen) FindItemUUID(path string, requireDirectory bool) (string, error) {
 	if len(strings.Join(strings.Split(path, "/"), "")) == 0 { // empty path
-		baseFolderUUID, err := filen.GetBaseFolderUUID()
-		if err != nil {
-			return "", err
-		}
-		return baseFolderUUID, nil
+		return filen.BaseFolderUUID, nil
 	} else {
 		file, directory, err := filen.FindItem(path, requireDirectory)
 		if err != nil {
@@ -77,17 +64,12 @@ func (filen *Filen) FindItemUUID(path string, requireDirectory bool) (string, er
 // Set requireDirectory to differentiate between files and directories with the same path (otherwise, the file will be found).
 // Returns nil for both File and Directory if none was found.
 func (filen *Filen) FindItem(path string, requireDirectory bool) (*File, *Directory, error) {
-	baseFolderUUID, err := filen.GetBaseFolderUUID()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
 		return nil, nil, fmt.Errorf("no segments in path %s", path)
 	}
 
-	currentUUID := baseFolderUUID
+	currentUUID := filen.BaseFolderUUID
 SegmentsLoop:
 	for segmentIdx, segment := range segments {
 		if segment == "" {
@@ -123,17 +105,12 @@ SegmentsLoop:
 // FindDirectoryOrCreate finds a cloud directory by its path and returns its UUID.
 // If the directory cannot be found, it (and all non-existent parent directories) will be created.
 func (filen *Filen) FindDirectoryOrCreate(path string) (string, error) {
-	baseFolderUUID, err := filen.GetBaseFolderUUID()
-	if err != nil {
-		return "", err
-	}
-
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
-		return baseFolderUUID, nil
+		return filen.BaseFolderUUID, nil
 	}
 
-	currentUUID := baseFolderUUID
+	currentUUID := filen.BaseFolderUUID
 SegmentsLoop:
 	for _, segment := range segments {
 		if segment == "" {

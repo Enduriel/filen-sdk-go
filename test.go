@@ -3,10 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
 	"os"
 	"path/filepath"
 	"strings"
+
+	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
 )
 
 func main() {
@@ -21,12 +22,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	baseFolderUUID, err := filen.GetBaseFolderUUID()
-	if err != nil {
-		panic(err)
-	}
 
-	_, _, err = filen.ReadDirectory(baseFolderUUID)
+	_, _, err = filen.ReadDirectory(filen.BaseFolderUUID)
 	if err != nil {
 		panic(err)
 	}
@@ -130,7 +127,7 @@ func main() {
 		panic(err)
 	}*/
 
-	directory, err := filen.CreateDirectory(baseFolderUUID, "uploads")
+	directory, err := filen.CreateDirectory(filen.BaseFolderUUID, "uploads")
 	if err != nil {
 		panic(err)
 	}
