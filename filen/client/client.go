@@ -51,7 +51,14 @@ var (
 
 // Client carries configuration.
 type Client struct {
-	APIKey string // the Filen API key
+	APIKey     string      // the Filen API key,
+	httpClient http.Client // cached request client
+}
+
+func New() *Client {
+	return &Client{
+		httpClient: http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 // A RequestError carries information on a failed HTTP request.
@@ -104,8 +111,7 @@ func (client *Client) Request(method string, path string, request any, data any)
 	}
 
 	// send request
-	httpClient := http.Client{Timeout: 10 * time.Second}
-	res, err := httpClient.Do(req)
+	res, err := client.httpClient.Do(req)
 	if err != nil {
 		return nil, &RequestError{"Cannot send request", method, path, err}
 	}
@@ -156,8 +162,7 @@ func (client *Client) DownloadFileChunk(uuid string, region string, bucket strin
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+client.APIKey)
-	httpClient := http.Client{}
-	res, err := httpClient.Do(req)
+	res, err := client.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -183,8 +188,7 @@ func (client *Client) UploadFileChunk(uuid string, chunkIdx int, parentUUID stri
 	req.Header.Set("Authorization", "Bearer "+client.APIKey)
 
 	// send request
-	httpClient := http.Client{}
-	res, err := httpClient.Do(req)
+	res, err := client.httpClient.Do(req)
 	if err != nil {
 		return "", "", err
 	}

@@ -28,7 +28,7 @@ type Filen struct {
 func New(email, password string) (*Filen, error) {
 	filen := &Filen{
 		Email:  email,
-		client: &client.Client{},
+		client: client.New(),
 	}
 
 	// fetch salt
