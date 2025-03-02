@@ -9,5 +9,6 @@ require (
 
 require (
 	github.com/dsnet/golib/memfile v1.0.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 )

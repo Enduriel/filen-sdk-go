@@ -3,6 +3,7 @@ package filen_sdk_go
 import (
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
+	"github.com/joho/godotenv"
 	"io"
 	"os"
 	"testing"
@@ -11,9 +12,15 @@ import (
 var filen *sdk.Filen
 
 func setupEnv() error {
-	email := "TODO"    // todo fill from env
-	password := "TODO" // todo fill from env
-	var err error
+
+	err := godotenv.Load()
+	if err != nil {
+		// we don't panic in case the environment variables are set somewhere else
+		println("Warning: Error loading .env file: ", err.Error())
+	}
+
+	email := os.Getenv("TEST_EMAIL")       // todo fill from env
+	password := os.Getenv("TEST_PASSWORD") // todo fill from env
 	filen, err = sdk.New(email, password)
 	if err != nil {
 		panic(err)
