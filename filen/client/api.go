@@ -1,6 +1,8 @@
 package client
 
-import "github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+import (
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+)
 
 // /v3/auth/info
 
@@ -10,12 +12,12 @@ type AuthInfo struct {
 }
 
 // GetAuthInfo calls /v3/auth/info.
-func (client *Client) GetAuthInfo(email string) (*AuthInfo, error) {
+func (client *UnauthorizedClient) GetAuthInfo(email string) (*AuthInfo, error) {
 	request := struct {
 		Email string `json:"email"`
 	}{email}
 	authInfo := &AuthInfo{}
-	_, err := client.Request("POST", "/v3/auth/info", request, authInfo)
+	_, err := client.RequestData("POST", GatewayURL("/v3/auth/info"), request, authInfo)
 	return authInfo, err
 }
 
@@ -29,7 +31,7 @@ type LoginResponse struct {
 }
 
 // Login calls /v3/login.
-func (client *Client) Login(email, password string) (*LoginResponse, error) {
+func (client *UnauthorizedClient) Login(email, password string) (*LoginResponse, error) {
 	request := struct {
 		Email         string `json:"email"`
 		Password      string `json:"password"`
@@ -37,7 +39,7 @@ func (client *Client) Login(email, password string) (*LoginResponse, error) {
 		AuthVersion   int    `json:"authVersion"`
 	}{email, password, "XXXXXX", 2}
 	response := &LoginResponse{}
-	_, err := client.Request("POST", "/v3/login", request, response)
+	_, err := client.RequestData("POST", GatewayURL("/v3/login"), request, response)
 	return response, err
 }
 
@@ -50,7 +52,7 @@ type UserBaseFolder struct {
 // GetUserBaseFolder calls /v3/user/baseFolder.
 func (client *Client) GetUserBaseFolder() (*UserBaseFolder, error) {
 	userBaseFolder := &UserBaseFolder{}
-	_, err := client.Request("GET", "/v3/user/baseFolder", nil, userBaseFolder)
+	_, err := client.RequestData("GET", GatewayURL("/v3/user/baseFolder"), nil, userBaseFolder)
 	return userBaseFolder, err
 }
 
@@ -88,7 +90,7 @@ func (client *Client) GetDirectoryContent(uuid string) (*DirectoryContent, error
 		UUID string `json:"uuid"`
 	}{uuid}
 	directoryContent := &DirectoryContent{}
-	_, err := client.Request("POST", "/v3/dir/content", request, directoryContent)
+	_, err := client.RequestData("POST", GatewayURL("/v3/dir/content"), request, directoryContent)
 	return directoryContent, err
 }
 
@@ -104,7 +106,7 @@ func (client *Client) GetUserMasterKeys(encryptedMasterKey crypto.EncryptedStrin
 		MasterKey crypto.EncryptedString `json:"masterKeys"`
 	}{encryptedMasterKey}
 	userMasterKeys := &UserMasterKeys{}
-	_, err := client.Request("POST", "/v3/user/masterKeys", request, userMasterKeys)
+	_, err := client.RequestData("POST", GatewayURL("/v3/user/masterKeys"), request, userMasterKeys)
 	return userMasterKeys, err
 }
 
@@ -114,7 +116,7 @@ type UploadDoneRequest struct {
 	UUID       string                 `json:"uuid"`
 	Name       crypto.EncryptedString `json:"name"`
 	NameHashed string                 `json:"nameHashed"`
-	Size       crypto.EncryptedString `json:"size"`
+	Size       string                 `json:"size"`
 	Chunks     int                    `json:"chunks"`
 	MimeType   crypto.EncryptedString `json:"mime"`
 	Rm         string                 `json:"rm"`
@@ -131,7 +133,7 @@ type UploadDoneResponse struct {
 // UploadDone calls /v3/upload/done.
 func (client *Client) UploadDone(request UploadDoneRequest) (*UploadDoneResponse, error) {
 	response := &UploadDoneResponse{}
-	_, err := client.Request("POST", "/v3/upload/done", request, response)
+	_, err := client.RequestData("POST", GatewayURL("/v3/upload/done"), request, response)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +147,7 @@ func (client *Client) TrashFile(uuid string) error {
 	request := struct {
 		UUID string `json:"uuid"`
 	}{uuid}
-	_, err := client.Request("POST", "/v3/file/trash", request, nil)
+	_, err := client.Request("POST", GatewayURL("/v3/file/trash"), request)
 	if err != nil {
 		return err
 	}
@@ -167,7 +169,7 @@ func (client *Client) CreateDirectory(uuid string, name crypto.EncryptedString, 
 		ParentUUID string                 `json:"parent"`
 	}{uuid, name, nameHashed, parentUUID}
 	response := &CreateDirectoryResponse{}
-	_, err := client.Request("POST", "/v3/dir/create", request, response)
+	_, err := client.RequestData("POST", GatewayURL("/v3/dir/create"), request, response)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +183,7 @@ func (client *Client) TrashDirectory(uuid string) error {
 	request := struct {
 		UUID string `json:"uuid"`
 	}{uuid}
-	_, err := client.Request("POST", "/v3/dir/trash", request, nil)
+	_, err := client.Request("POST", GatewayURL("/v3/dir/trash"), request)
 	if err != nil {
 		return err
 	}

@@ -26,13 +26,10 @@ type Filen struct {
 // New creates a new Filen and initializes it with the given email and password
 // by logging in with the API and preparing the API key and master keys.
 func New(email, password string) (*Filen, error) {
-	filen := &Filen{
-		Email:  email,
-		client: client.New(),
-	}
+	unauthorizedClient := client.New()
 
 	// fetch salt
-	authInfo, err := filen.client.GetAuthInfo(email)
+	authInfo, err := unauthorizedClient.GetAuthInfo(email)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +37,15 @@ func New(email, password string) (*Filen, error) {
 	masterKey, password := crypto.GeneratePasswordAndMasterKey(password, authInfo.Salt)
 
 	// login and get keys
-	keys, err := filen.client.Login(email, password)
+	keys, err := unauthorizedClient.Login(email, password)
 	if err != nil {
 		return nil, err
 	}
-	filen.client.APIKey = keys.APIKey
+
+	filen := &Filen{
+		Email:  email,
+		client: unauthorizedClient.Authorize(keys.APIKey),
+	}
 
 	// fetch, encrypt and apply master keys
 	encryptedMasterKey, err := crypto.EncryptMetadata(string(masterKey), masterKey)

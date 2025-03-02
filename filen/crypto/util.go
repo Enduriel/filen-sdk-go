@@ -49,6 +49,16 @@ func GenerateRandomString(length int) string {
 	return str
 }
 
+func GenerateRandomBytes(length int) []byte {
+	b := make([]byte, length)
+	// rand.Read fills b with random bytes and never errors according to doc
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func runAES256GCMEncryption(key []byte, nonce []byte, plaintext []byte) ([]byte, error) {
 	c, err := aes.NewCipher(key)
 	if err != nil {
