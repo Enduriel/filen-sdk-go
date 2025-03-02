@@ -9,12 +9,27 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"golang.org/x/crypto/argon2"
 )
 
 // EncryptedString denotes that a string is encrypted and can't be used meaningfully before being decrypted.
 type EncryptedString string
 
 // other
+
+type KeyEncryptionKey [32]byte
+type AuthKey [32]byte
+
+func DeriveKeyAndAuthFromPasswordV3(password string, salt string) (KeyEncryptionKey, AuthKey) {
+	derived := argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64)
+	var (
+		key     KeyEncryptionKey
+		authKey AuthKey
+	)
+	copy(key[:], derived[:32])
+	copy(authKey[:], derived[32:])
+	return key, authKey
+}
 
 // DeriveKeyFromPassword derives a valid key from the raw password.
 func DeriveKeyFromPassword(password string, salt string, iterations int, bitLength int) []byte {
