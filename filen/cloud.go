@@ -15,18 +15,18 @@ import (
 
 // File represents a file on the cloud drive.
 type File struct {
-	UUID          string    // the UUID of the cloud item
-	Name          string    // the file name
-	Size          int64     // the file size in bytes
-	MimeType      string    // the MIME type of the file
-	EncryptionKey []byte    // the key used to encrypt the file data
-	Created       time.Time // when the file was created
-	LastModified  time.Time // when the file was last modified
-	ParentUUID    string    // the [Directory.UUID] of the file's parent directory
-	Favorited     bool      // whether the file is marked a favorite
-	Region        string    // the file's storage region
-	Bucket        string    // the file's storage bucket
-	Chunks        int       // how many 1 MiB chunks the file is partitioned into
+	UUID          string         // the UUID of the cloud item
+	Name          string         // the file name
+	Size          int64          // the file size in bytes
+	MimeType      string         // the MIME type of the file
+	EncryptionKey crypto.FileKey // the key used to encrypt the file data
+	Created       time.Time      // when the file was created
+	LastModified  time.Time      // when the file was last modified
+	ParentUUID    string         // the [Directory.UUID] of the file's parent directory
+	Favorited     bool           // whether the file is marked a favorite
+	Region        string         // the file's storage region
+	Bucket        string         // the file's storage bucket
+	Chunks        int            // how many 1 MiB chunks the file is partitioned into
 }
 
 // Directory represents a directory on the cloud drive.
@@ -42,11 +42,11 @@ type Directory struct {
 // FindItemUUID finds a cloud item by its path and returns its UUID.
 // Returns an empty string if none was found.
 // Use this instead of FindItem to correctly handle paths pointing to the base directory.
-func (filen *Filen) FindItemUUID(path string, requireDirectory bool) (string, error) {
+func (api *Filen) FindItemUUID(path string, requireDirectory bool) (string, error) {
 	if len(strings.Join(strings.Split(path, "/"), "")) == 0 { // empty path
-		return filen.BaseFolderUUID, nil
+		return api.BaseFolderUUID, nil
 	} else {
-		file, directory, err := filen.FindItem(path, requireDirectory)
+		file, directory, err := api.FindItem(path, requireDirectory)
 		if err != nil {
 			return "", err
 		}
@@ -63,20 +63,20 @@ func (filen *Filen) FindItemUUID(path string, requireDirectory bool) (string, er
 // FindItem find a cloud item by its path and returns it (either the File or the Directory will be returned).
 // Set requireDirectory to differentiate between files and directories with the same path (otherwise, the file will be found).
 // Returns nil for both File and Directory if none was found.
-func (filen *Filen) FindItem(path string, requireDirectory bool) (*File, *Directory, error) {
+func (api *Filen) FindItem(path string, requireDirectory bool) (*File, *Directory, error) {
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
 		return nil, nil, fmt.Errorf("no segments in path %s", path)
 	}
 
-	currentUUID := filen.BaseFolderUUID
+	currentUUID := api.BaseFolderUUID
 SegmentsLoop:
 	for segmentIdx, segment := range segments {
 		if segment == "" {
 			continue
 		}
 
-		files, directories, err := filen.ReadDirectory(currentUUID)
+		files, directories, err := api.ReadDirectory(currentUUID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -104,20 +104,20 @@ SegmentsLoop:
 
 // FindDirectoryOrCreate finds a cloud directory by its path and returns its UUID.
 // If the directory cannot be found, it (and all non-existent parent directories) will be created.
-func (filen *Filen) FindDirectoryOrCreate(path string) (string, error) {
+func (api *Filen) FindDirectoryOrCreate(path string) (string, error) {
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
-		return filen.BaseFolderUUID, nil
+		return api.BaseFolderUUID, nil
 	}
 
-	currentUUID := filen.BaseFolderUUID
+	currentUUID := api.BaseFolderUUID
 SegmentsLoop:
 	for _, segment := range segments {
 		if segment == "" {
 			continue
 		}
 
-		_, directories, err := filen.ReadDirectory(currentUUID)
+		_, directories, err := api.ReadDirectory(currentUUID)
 		if err != nil {
 			return "", err
 		}
@@ -129,7 +129,7 @@ SegmentsLoop:
 			}
 		}
 		// create directory
-		directory, err := filen.CreateDirectory(currentUUID, segment)
+		directory, err := api.CreateDirectory(currentUUID, segment)
 		if err != nil {
 			return "", err
 		}
@@ -139,9 +139,9 @@ SegmentsLoop:
 }
 
 // ReadDirectory fetches the files and directories that are children of a directory (specified by UUID).
-func (filen *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
+func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// fetch directory content
-	directoryContent, err := filen.client.GetDirectoryContent(uuid)
+	directoryContent, err := api.client.GetDirectoryContent(uuid)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -149,9 +149,9 @@ func (filen *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// transform files
 	files := make([]*File, 0)
 	for _, file := range directoryContent.Uploads {
-		metadataStr, err := crypto.DecryptMetadataAllKeys(file.Metadata, filen.MasterKeys)
+		metadataStr, err := api.MasterKeys.DecryptMeta(file.Metadata)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
 		var metadata struct {
 			Name         string `json:"name"`
@@ -165,12 +165,21 @@ func (filen *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 			return nil, nil, err
 		}
 
+		if len(metadata.Key) != 32 {
+
+		}
+
+		encryptionKey, err := crypto.NewFileKeyFromStr(metadata.Key)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		files = append(files, &File{
 			UUID:          file.UUID,
 			Name:          metadata.Name,
 			Size:          int64(metadata.Size),
 			MimeType:      metadata.MimeType,
-			EncryptionKey: []byte(metadata.Key),
+			EncryptionKey: *encryptionKey,
 			Created:       util.TimestampToTime(int64(file.Timestamp)),
 			LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
 			ParentUUID:    file.Parent,
@@ -184,7 +193,7 @@ func (filen *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// transform directories
 	directories := make([]*Directory, 0)
 	for _, directory := range directoryContent.Folders {
-		nameStr, err := crypto.DecryptMetadataAllKeys(directory.Name, filen.MasterKeys)
+		nameStr, err := api.MasterKeys.DecryptMeta(directory.Name)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -210,12 +219,12 @@ func (filen *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 }
 
 // TrashFile moves a file to trash.
-func (filen *Filen) TrashFile(uuid string) error {
-	return filen.client.TrashFile(uuid)
+func (api *Filen) TrashFile(uuid string) error {
+	return api.client.TrashFile(uuid)
 }
 
 // CreateDirectory creates a new directory.
-func (filen *Filen) CreateDirectory(parentUUID string, name string) (*Directory, error) {
+func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, error) {
 	directoryUUID := uuid.New().String()
 
 	// encrypt metadata
@@ -226,16 +235,13 @@ func (filen *Filen) CreateDirectory(parentUUID string, name string) (*Directory,
 	if err != nil {
 		return nil, err
 	}
-	metadataEncrypted, err := crypto.EncryptMetadata(string(metadataStr), filen.CurrentMasterKey())
-	if err != nil {
-		return nil, err
-	}
+	metadataEncrypted := api.MasterKeys.EncryptMeta(string(metadataStr))
 
 	// hash name
 	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(name)))
 
 	// send
-	response, err := filen.client.CreateDirectory(directoryUUID, metadataEncrypted, nameHashed, parentUUID)
+	response, err := api.client.CreateDirectory(directoryUUID, metadataEncrypted, nameHashed, parentUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +256,6 @@ func (filen *Filen) CreateDirectory(parentUUID string, name string) (*Directory,
 }
 
 // TrashDirectory moves a directory to trash.
-func (filen *Filen) TrashDirectory(uuid string) error {
-	return filen.client.TrashDirectory(uuid)
+func (api *Filen) TrashDirectory(uuid string) error {
+	return api.client.TrashDirectory(uuid)
 }

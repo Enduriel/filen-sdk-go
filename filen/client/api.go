@@ -27,17 +27,18 @@ type LoginResponse struct {
 	APIKey     string                 `json:"apiKey"`
 	MasterKeys crypto.EncryptedString `json:"masterKeys"`
 	PublicKey  string                 `json:"publicKey"`
-	PrivateKey string                 `json:"privateKey"`
+	PrivateKey crypto.EncryptedString `json:"privateKey"`
+	DEK        crypto.EncryptedString `json:"dek"`
 }
 
 // Login calls /v3/login.
-func (client *UnauthorizedClient) Login(email, password string) (*LoginResponse, error) {
+func (client *UnauthorizedClient) Login(email string, password crypto.DerivedPassword) (*LoginResponse, error) {
 	request := struct {
 		Email         string `json:"email"`
 		Password      string `json:"password"`
 		TwoFactorCode string `json:"twoFactorCode"`
 		AuthVersion   int    `json:"authVersion"`
-	}{email, password, "XXXXXX", 2}
+	}{email, string(password), "XXXXXX", 2}
 	response := &LoginResponse{}
 	_, err := client.RequestData("POST", GatewayURL("/v3/login"), request, response)
 	return response, err
@@ -188,4 +189,26 @@ func (client *Client) TrashDirectory(uuid string) error {
 		return err
 	}
 	return nil
+}
+
+func (client *Client) PostV3UserDEK(encryptedDEK crypto.EncryptedString) error {
+	request := struct {
+		DEK crypto.EncryptedString `json:"dek"`
+	}{encryptedDEK}
+	_, err := client.Request("POST", GatewayURL("/v3/user/dek"), request)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (client *Client) GetV3UserDEK() (crypto.EncryptedString, error) {
+	var response struct {
+		DEK crypto.EncryptedString `json:"dek"`
+	}
+	_, err := client.RequestData("GET", GatewayURL("/v3/user/dek"), nil, &response)
+	if err != nil {
+		return "", err
+	}
+	return response.DEK, nil
 }

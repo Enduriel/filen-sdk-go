@@ -80,7 +80,8 @@ func (fd *fileDownload) decryptChunks(in <-chan Chunk, out chan<- Chunk) error {
 			g.Go(func() error {
 				defer func() { <-sem }()
 				fmt.Printf("Decrypting chunk %d\n", chunk.Index)
-				decryptedBytes, err := crypto.DecryptData(chunk.Data, fd.file.EncryptionKey)
+
+				decryptedBytes, err := fd.file.EncryptionKey.DecryptData(chunk.Data)
 				if err != nil {
 					return fmt.Errorf("decrypt chunk %d: %w", chunk.Index, err)
 				}
@@ -116,9 +117,9 @@ func (fd *fileDownload) writeChunks(in <-chan Chunk, ws io.WriteSeeker) error {
 	}
 }
 
-func (filen *Filen) DownloadFile(file *File, ws io.WriteSeeker) error {
+func (api *Filen) DownloadFile(file *File, ws io.WriteSeeker) error {
 	g, ctx := errgroup.WithContext(context.Background())
-	fd := newFileDownload(filen, file, ctx)
+	fd := newFileDownload(api, file, ctx)
 	downloadedChunks := make(chan Chunk, maxDownloadedBuffer)
 	decryptedChunks := make(chan Chunk, maxCryptoedBuffer)
 
@@ -150,7 +151,7 @@ type FileUpload struct {
 	UUID string
 	// needed for chunk upload
 	uploadKey     string
-	encryptionKey string
+	encryptionKey crypto.FileKey
 	ctx           context.Context
 	filen         *Filen
 	// needed for file metadata
@@ -162,15 +163,36 @@ type Chunk struct {
 	Data  []byte
 }
 
-func NewFileUpload(filen *Filen, parentUUID string, ctx context.Context) *FileUpload {
+func NewFileUpload(filen *Filen, parentUUID string, ctx context.Context) (*FileUpload, error) {
+
+	// TODO check if this is the correct approach
+	var (
+		encryptionKey *crypto.FileKey
+		err           error
+	)
+	if filen.AuthVersion == 2 || filen.AuthVersion == 1 {
+		encryptionKeyStr := crypto.GenerateRandomString(32)
+		encryptionKey, err = crypto.NewFileKey([32]byte([]byte(encryptionKeyStr)))
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 2: %w", err)
+		}
+	} else if filen.AuthVersion == 3 {
+		encryptionKey, err = crypto.NewFileKey([32]byte(crypto.GenerateRandomBytes(32)))
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 3: %w", err)
+		}
+	} else {
+		panic("unknown auth version")
+	}
+
 	return &FileUpload{
 		UUID:          uuid.New().String(),
 		ParentUUID:    parentUUID,
 		uploadKey:     crypto.GenerateRandomString(32),
-		encryptionKey: crypto.GenerateRandomString(32),
+		encryptionKey: *encryptionKey,
 		ctx:           ctx,
 		filen:         filen,
-	}
+	}, nil
 }
 
 func (fu *FileUpload) readChunks(inReader io.Reader, outChunks chan<- Chunk) (int, error) {
@@ -224,12 +246,7 @@ func (fu *FileUpload) encryptChunks(in <-chan Chunk, out chan<- Chunk) error {
 		case sem <- struct{}{}:
 			g.Go(func() error {
 				defer func() { <-sem }()
-				encrypted, err := crypto.EncryptData(chunk.Data, []byte(fu.encryptionKey))
-				if err != nil {
-					return fmt.Errorf("encrypt chunk: %w", err)
-				}
-				chunk.Data = encrypted
-
+				chunk.Data = fu.encryptionKey.EncryptData(chunk.Data)
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -290,20 +307,15 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 		LastModified int    `json:"lastModified"`
 		Created      int    `json:"created"`
 		// TODO add hash, which is the hash of unencrypted bytes
-	}{name, size, "text/plain", fu.encryptionKey, int(time.Now().Unix()), int(time.Now().Unix())}
+	}{name, size, "text/plain", fu.encryptionKey.ToString(fu.filen.AuthVersion), int(time.Now().Unix()), int(time.Now().Unix())}
 	metadataStr, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, fmt.Errorf("marshal file metadata: %w", err)
 	}
 
-	metadataEncrypted, err := crypto.EncryptMetadata(string(metadataStr), fu.filen.CurrentMasterKey())
-	if err != nil {
-		return nil, fmt.Errorf("encrypt file metadata: %w", err)
-	}
-	nameEncrypted, err := crypto.EncryptMetadata(name, fu.filen.CurrentMasterKey())
-	if err != nil {
-		return nil, fmt.Errorf("encrypt file name: %w", err)
-	}
+	metadataEncrypted := fu.filen.EncryptMeta(string(metadataStr))
+	nameEncrypted := fu.filen.EncryptMeta(name)
+	// TODO consider seeding this hash with the DEK
 	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(name)))
 
 	numChunks := (size / chunkSize) + 1
@@ -329,7 +341,7 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 		Name:          name,
 		Size:          int64(size),
 		MimeType:      "application/octet-stream", //TODO correct mime type
-		EncryptionKey: []byte(fu.uploadKey),
+		EncryptionKey: fu.encryptionKey,
 		Created:       time.Now(), //TODO really?
 		LastModified:  time.Now(),
 		ParentUUID:    fu.ParentUUID,
@@ -341,9 +353,12 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 
 }
 
-func (filen *Filen) UploadFile(fileName string, parentUUID string, data io.Reader) (*File, error) {
+func (api *Filen) UploadFile(fileName string, parentUUID string, data io.Reader) (*File, error) {
 	eg, ctx := errgroup.WithContext(context.Background())
-	fileUpload := NewFileUpload(filen, parentUUID, ctx)
+	fileUpload, err := NewFileUpload(api, parentUUID, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("new file upload: %w", err)
+	}
 	readChunks := make(chan Chunk, maxReadBuffer)
 	encryptedChunks := make(chan Chunk, maxCryptoedBuffer)
 	var (
