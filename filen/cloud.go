@@ -141,7 +141,7 @@ SegmentsLoop:
 // ReadDirectory fetches the files and directories that are children of a directory (specified by UUID).
 func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// fetch directory content
-	directoryContent, err := api.client.GetDirectoryContent(uuid)
+	directoryContent, err := api.client.PostV3DirContent(uuid)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -220,7 +220,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 
 // TrashFile moves a file to trash.
 func (api *Filen) TrashFile(uuid string) error {
-	return api.client.TrashFile(uuid)
+	return api.client.PostV3FileTrash(uuid)
 }
 
 // CreateDirectory creates a new directory.
@@ -241,7 +241,7 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(name)))
 
 	// send
-	response, err := api.client.CreateDirectory(directoryUUID, metadataEncrypted, nameHashed, parentUUID)
+	response, err := api.client.PostV3DirCreate(directoryUUID, metadataEncrypted, nameHashed, parentUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -257,5 +257,5 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 
 // TrashDirectory moves a directory to trash.
 func (api *Filen) TrashDirectory(uuid string) error {
-	return api.client.TrashDirectory(uuid)
+	return api.client.PostV3DirTrash(uuid)
 }

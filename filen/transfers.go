@@ -270,7 +270,7 @@ func (fu *FileUpload) uploadChunks(in <-chan Chunk) (string, string, error) {
 
 	// need to handle the first chunk separately
 	g.Go(func() error {
-		r, b, err := fu.filen.client.UploadFileChunk(fu.UUID, firstChunk.Index, fu.ParentUUID, fu.uploadKey, firstChunk.Data)
+		r, b, err := fu.filen.client.PostV3Upload(fu.UUID, firstChunk.Index, fu.ParentUUID, fu.uploadKey, firstChunk.Data)
 		if err != nil {
 			return fmt.Errorf("upload first chunk: %w", err)
 		}
@@ -287,7 +287,7 @@ func (fu *FileUpload) uploadChunks(in <-chan Chunk) (string, string, error) {
 		case sem <- struct{}{}:
 			g.Go(func() error {
 				defer func() { <-sem }()
-				_, _, err := fu.filen.client.UploadFileChunk(fu.UUID, chunk.Index, fu.ParentUUID, fu.uploadKey, chunk.Data)
+				_, _, err := fu.filen.client.PostV3Upload(fu.UUID, chunk.Index, fu.ParentUUID, fu.uploadKey, chunk.Data)
 				if err != nil {
 					return fmt.Errorf("upload chunk %d: %w", chunk.Index, err)
 				}
@@ -319,7 +319,7 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(name)))
 
 	numChunks := (size / chunkSize) + 1
-	response, err := fu.filen.client.UploadDone(client.UploadDoneRequest{
+	response, err := fu.filen.client.PostV3UploadDone(client.V3UploadDoneRequest{
 		UUID:       fu.UUID,
 		Name:       nameEncrypted,
 		NameHashed: nameHashed,

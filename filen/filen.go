@@ -30,13 +30,13 @@ type Filen struct {
 	BaseFolderUUID string
 }
 
-func newV2(email, password string, info *client.AuthInfo, unauthorizedClient *client.UnauthorizedClient) (*Filen, error) {
+func newV2(email, password string, info *client.V3AuthInfoResponse, unauthorizedClient *client.UnauthorizedClient) (*Filen, error) {
 	// login
 	masterKey, derivedPass, err := crypto.DeriveMKAndAuthFromPassword(password, info.Salt)
 	if err != nil {
 		return nil, fmt.Errorf("DeriveMKAndAuthFromPassword: %w", err)
 	}
-	response, err := unauthorizedClient.Login(email, derivedPass)
+	response, err := unauthorizedClient.PostV3Login(email, derivedPass)
 	if err != nil {
 		return nil, fmt.Errorf("failed to log in: %w", err)
 	}
@@ -44,7 +44,7 @@ func newV2(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 
 	// master keys decryption
 	encryptedMasterKey := masterKey.EncryptMeta(string(masterKey.Bytes[:]))
-	mkResponse, err := c.GetUserMasterKeys(encryptedMasterKey)
+	mkResponse, err := c.PostV3UserMasterKeys(encryptedMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get master keys: %w", err)
 	}
@@ -72,7 +72,7 @@ func newV2(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	}
 
 	// set up base folder
-	baseFolderResponse, err := c.GetUserBaseFolder()
+	baseFolderResponse, err := c.GetV3UserBaseFolder()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get base folder: %w", err)
 	}
@@ -88,7 +88,7 @@ func newV2(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	}, nil
 }
 
-func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *client.UnauthorizedClient) (*Filen, error) {
+func newV3(email, password string, info *client.V3AuthInfoResponse, unauthorizedClient *client.UnauthorizedClient) (*Filen, error) {
 	// a lot of this is the same above which isn't very DRY,
 	// but is annoying to do nicely with interfaces
 
@@ -97,7 +97,7 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	if err != nil {
 		return nil, fmt.Errorf("DeriveKEKAndAuthFromPassword: %w", err)
 	}
-	response, err := unauthorizedClient.Login(email, derivedPass)
+	response, err := unauthorizedClient.PostV3Login(email, derivedPass)
 	if err != nil {
 		return nil, fmt.Errorf("failed to log in: %w", err)
 	}
@@ -105,7 +105,7 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 
 	// master keys decryption
 	encryptedKEK := kek.EncryptMeta(hex.EncodeToString(kek.Bytes[:]))
-	mkResponse, err := c.GetUserMasterKeys(encryptedKEK)
+	mkResponse, err := c.PostV3UserMasterKeys(encryptedKEK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get master keys using kek: %w", err)
 	}
@@ -146,7 +146,7 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	}
 
 	// set up base folder
-	baseFolderResponse, err := c.GetUserBaseFolder()
+	baseFolderResponse, err := c.GetV3UserBaseFolder()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get base folder: %w", err)
 	}
@@ -197,7 +197,7 @@ func New(email, password string) (*Filen, error) {
 	unauthorizedClient := client.New()
 
 	// fetch salt
-	authInfo, err := unauthorizedClient.GetAuthInfo(email)
+	authInfo, err := unauthorizedClient.PostV3AuthInfo(email)
 	if err != nil {
 		return nil, err
 	}
