@@ -190,69 +190,18 @@ func DeriveMKAndAuthFromPassword(password string, salt string) (*MasterKey, Deri
 
 // v3
 
-type DataEncryptionKey struct {
+type V3EncryptionKey struct {
 	Bytes  [32]byte
 	cipher cipher.AEAD
 }
 
-func NewDataEncryptionKey(key [32]byte) (*DataEncryptionKey, error) {
-	c, err := getCipherForKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("NewDataEncryptionKey: %v", err)
-	}
-	return &DataEncryptionKey{
-		Bytes:  key,
-		cipher: c,
-	}, nil
-}
-
-func DEKFromDecryptedString(decrypted string) (*DataEncryptionKey, error) {
-	decoded, err := hex.DecodeString(decrypted)
-	if err != nil {
-		return nil, fmt.Errorf("decoding DEK: %w", err)
-	}
-	dek, err := NewDataEncryptionKey([32]byte(decoded))
-	if err != nil {
-		return nil, fmt.Errorf("initializing DEK: %w", err)
-	}
-	return dek, nil
-}
-
-func (dek *DataEncryptionKey) ToString() string {
-	return hex.EncodeToString(dek.Bytes[:])
-}
-
-func (dek *DataEncryptionKey) EncryptMeta(metadata string) EncryptedString {
-	panic("unimplemented")
-}
-
-func (dek *DataEncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
-	panic("unimplemented")
-}
-
-type KeyEncryptionKey struct {
-	Bytes  [32]byte
-	cipher cipher.AEAD
-}
-
-func NewKeyEncryptionKey(key [32]byte) (*KeyEncryptionKey, error) {
-	c, err := getCipherForKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("NewKeyEncryptionKey: %v", err)
-	}
-	return &KeyEncryptionKey{
-		Bytes:  key,
-		cipher: c,
-	}, nil
-}
-
-func (kek *KeyEncryptionKey) EncryptMeta(metadata string) EncryptedString {
+func (key *V3EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 	nonce := [12]byte(GenerateRandomBytes(12))
-	encrypted := kek.cipher.Seal(nil, nonce[:], []byte(metadata), nil)
+	encrypted := key.cipher.Seal(nil, nonce[:], []byte(metadata), nil)
 	return NewEncryptedStringV3(encrypted, nonce)
 }
 
-func (kek *KeyEncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
+func (key *V3EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
 	if metadata[0:3] != "003" {
 		return "", fmt.Errorf("unknown metadata format")
 	}
@@ -260,21 +209,44 @@ func (kek *KeyEncryptionKey) DecryptMeta(metadata EncryptedString) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("decoding nonce: %v", err)
 	}
-	decrypted, err := kek.cipher.Open(nil, nonce[:], []byte(metadata[27:]), nil)
+	decrypted, err := key.cipher.Open(nil, nonce[:], []byte(metadata[27:]), nil)
 	if err != nil {
 		return "", fmt.Errorf("decrypting: %v", err)
 	}
 	return string(decrypted), nil
 }
 
-func DeriveKEKAndAuthFromPassword(password string, salt string) (*KeyEncryptionKey, DerivedPassword, error) {
+func NewV3EncryptionKey(key [32]byte) (*V3EncryptionKey, error) {
+	c, err := getCipherForKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("NewV3EncryptionKey: %v", err)
+	}
+	return &V3EncryptionKey{
+		Bytes:  key,
+		cipher: c,
+	}, nil
+}
+
+func NewV3EncryptionKeyFromStr(key string) (*V3EncryptionKey, error) {
+	decoded, err := hex.DecodeString(key)
+	if err != nil {
+		return nil, fmt.Errorf("decoding DEK: %w", err)
+	}
+	return NewV3EncryptionKey([32]byte(decoded))
+}
+
+func (key *V3EncryptionKey) ToString() string {
+	return hex.EncodeToString(key.Bytes[:])
+}
+
+func DeriveKEKAndAuthFromPassword(password string, salt string) (*V3EncryptionKey, DerivedPassword, error) {
 	derived := argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64)
 	var rawKEK [32]byte
 	copy(rawKEK[:], derived[:32])
 
-	kek, err := NewKeyEncryptionKey(rawKEK)
+	kek, err := NewV3EncryptionKey(rawKEK)
 	if err != nil {
-		return nil, "", fmt.Errorf("NewKeyEncryptionKey: %v", err)
+		return nil, "", fmt.Errorf("NewV3EncryptionKey: %v", err)
 	}
 	return kek, DerivedPassword(hex.EncodeToString(derived[32:])), nil
 }

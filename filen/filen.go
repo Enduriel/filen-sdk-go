@@ -19,8 +19,8 @@ type Filen struct {
 	// their password, a new master key is appended. For decryption, all master keys are tried
 	// until one works; for encryption, always use the latest master key.
 	MasterKeys crypto.MasterKeys
-	DEK        crypto.DataEncryptionKey
-	KEK        crypto.KeyEncryptionKey
+	DEK        crypto.V3EncryptionKey
+	KEK        crypto.V3EncryptionKey
 
 	// BaseFolderUUID is the UUID of the cloud drive's root directory
 	BaseFolderUUID string
@@ -112,7 +112,7 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt DEK: %w", err)
 	}
-	dek, err := crypto.DEKFromDecryptedString(decryptedDEKStr)
+	dek, err := crypto.NewV3EncryptionKeyFromStr(decryptedDEKStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DEK: %w", err)
 	}
