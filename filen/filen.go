@@ -103,17 +103,6 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	}
 	c := unauthorizedClient.Authorize(response.APIKey)
 
-	// rsa keys
-	privateKeyStr, err := kek.DecryptMeta(response.PrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
-	}
-
-	privateKey, publicKey, err := crypto.RSAKeyPairFromStrings(privateKeyStr, response.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
-	}
-
 	// master keys decryption
 	encryptedKEK := kek.EncryptMeta(hex.EncodeToString(kek.Bytes[:]))
 	mkResponse, err := c.GetUserMasterKeys(encryptedKEK)
@@ -143,6 +132,17 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 	dek, err := crypto.MakeEncryptionKeyFromStr(decryptedDEKStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DEK: %w", err)
+	}
+
+	// rsa keys
+	privateKeyStr, err := dek.DecryptMeta(response.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+	}
+
+	privateKey, publicKey, err := crypto.RSAKeyPairFromStrings(privateKeyStr, response.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
 	}
 
 	// set up base folder
