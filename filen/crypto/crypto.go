@@ -186,18 +186,18 @@ func DeriveMKAndAuthFromPassword(password string, salt string) (*MasterKey, Deri
 
 // v3
 
-type V3EncryptionKey struct {
+type EncryptionKey struct {
 	Bytes  [32]byte
 	cipher cipher.AEAD
 }
 
-func (key *V3EncryptionKey) EncryptMeta(metadata string) EncryptedString {
+func (key *EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 	nonce := [12]byte(GenerateRandomBytes(12))
 	encrypted := key.cipher.Seal(nil, nonce[:], []byte(metadata), nil)
 	return NewEncryptedStringV3(encrypted, nonce)
 }
 
-func (key *V3EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
+func (key *EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
 	if metadata[0:3] != "003" {
 		return "", fmt.Errorf("unknown metadata format")
 	}
@@ -212,104 +212,88 @@ func (key *V3EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error
 	return string(decrypted), nil
 }
 
-func NewV3EncryptionKey(key [32]byte) (*V3EncryptionKey, error) {
+func MakeEncryptionKeyFromBytes(key [32]byte) (*EncryptionKey, error) {
 	c, err := getCipherForKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("NewV3EncryptionKey: %v", err)
+		return nil, fmt.Errorf("MakeEncryptionKeyFromBytes: %v", err)
 	}
-	return &V3EncryptionKey{
+	return &EncryptionKey{
 		Bytes:  key,
 		cipher: c,
 	}, nil
 }
 
-func NewV3EncryptionKeyFromStr(key string) (*V3EncryptionKey, error) {
+func MakeEncryptionKeyFromStr(key string) (*EncryptionKey, error) {
 	decoded, err := hex.DecodeString(key)
 	if err != nil {
 		return nil, fmt.Errorf("decoding DEK: %w", err)
 	}
-	return NewV3EncryptionKey([32]byte(decoded))
+	return MakeEncryptionKeyFromBytes([32]byte(decoded))
 }
 
-func (key *V3EncryptionKey) ToString() string {
+func NewEncryptionKey() (*EncryptionKey, error) {
+	return MakeEncryptionKeyFromBytes([32]byte(GenerateRandomBytes(32)))
+}
+
+func (key *EncryptionKey) ToString() string {
 	return hex.EncodeToString(key.Bytes[:])
 }
 
-func DeriveKEKAndAuthFromPassword(password string, salt string) (*V3EncryptionKey, DerivedPassword, error) {
+func DeriveKEKAndAuthFromPassword(password string, salt string) (*EncryptionKey, DerivedPassword, error) {
 	derived := argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64)
 	var rawKEK [32]byte
 	copy(rawKEK[:], derived[:32])
 
-	kek, err := NewV3EncryptionKey(rawKEK)
+	kek, err := MakeEncryptionKeyFromBytes(rawKEK)
 	if err != nil {
-		return nil, "", fmt.Errorf("NewV3EncryptionKey: %v", err)
+		return nil, "", fmt.Errorf("MakeEncryptionKeyFromBytes: %v", err)
 	}
 	return kek, DerivedPassword(hex.EncodeToString(derived[32:])), nil
 }
 
 // file
-type FileKey struct {
-	Bytes  [32]byte
-	cipher cipher.AEAD
-}
 
-func NewFileKey(key [32]byte) (*FileKey, error) {
-	c, err := getCipherForKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("NewFileKey: %v", err)
-	}
-
-	return &FileKey{
-		Bytes:  key,
-		cipher: c,
-	}, nil
-}
-
-func NewFileKeyFromStr(key string) (*FileKey, error) {
+func MakeEncryptionKeyFromUnknownStr(key string) (*EncryptionKey, error) {
 	switch len(key) {
 	case 32: // v1 & v2
-		return NewFileKey([32]byte([]byte(key)))
+		return MakeEncryptionKeyFromBytes([32]byte([]byte(key)))
 	case 64: // v3
-		decoded, err := hex.DecodeString(key)
-		if err != nil {
-			return nil, fmt.Errorf("decoding file key: %v", err)
-		}
-		return NewFileKey([32]byte(decoded))
+		return MakeEncryptionKeyFromStr(key)
 	default:
 		return nil, fmt.Errorf("key length wrong")
 	}
 }
 
-func (fk *FileKey) encrypt(nonce []byte, data []byte) []byte {
-	return fk.cipher.Seal(data[:0], nonce, data, nil)
+func (key *EncryptionKey) encrypt(nonce []byte, data []byte) []byte {
+	return key.cipher.Seal(data[:0], nonce, data, nil)
 }
 
-func (fk *FileKey) EncryptData(data []byte) []byte {
+func (key *EncryptionKey) EncryptData(data []byte) []byte {
 	nonce := GenerateRandomBytes(12)
-	data = fk.encrypt(nonce[:], data)
+	data = key.encrypt(nonce[:], data)
 	return append(nonce, data...)
 }
 
-func (fk *FileKey) decrypt(nonce []byte, data []byte) error {
-	data, err := fk.cipher.Open(data[:0], nonce, data, nil)
+func (key *EncryptionKey) decrypt(nonce []byte, data []byte) error {
+	data, err := key.cipher.Open(data[:0], nonce, data, nil)
 	if err != nil {
 		return fmt.Errorf("open: %v", err)
 	}
 	return nil
 }
 
-func (fk *FileKey) DecryptData(data []byte) ([]byte, error) {
+func (key *EncryptionKey) DecryptData(data []byte) ([]byte, error) {
 	nonce := data[:12]
-	err := fk.decrypt(nonce, data[12:])
+	err := key.decrypt(nonce, data[12:])
 	if err != nil {
 		return nil, err
 	}
 	return data[12:], nil
 }
 
-func (fk *FileKey) ToString(authVersion int) string {
+func (key *EncryptionKey) ToStringWithAuthVersion(authVersion int) string {
 	if authVersion == 3 {
-		return hex.EncodeToString(fk.Bytes[:])
+		return hex.EncodeToString(key.Bytes[:])
 	}
-	return string(fk.Bytes[:])
+	return string(key.Bytes[:])
 }

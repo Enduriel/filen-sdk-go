@@ -151,7 +151,7 @@ type FileUpload struct {
 	UUID string
 	// needed for chunk upload
 	uploadKey     string
-	encryptionKey crypto.FileKey
+	encryptionKey crypto.EncryptionKey
 	ctx           context.Context
 	filen         *Filen
 	// needed for file metadata
@@ -167,17 +167,17 @@ func NewFileUpload(filen *Filen, parentUUID string, ctx context.Context) (*FileU
 
 	// TODO check if this is the correct approach
 	var (
-		encryptionKey *crypto.FileKey
+		encryptionKey *crypto.EncryptionKey
 		err           error
 	)
 	if filen.AuthVersion == 2 || filen.AuthVersion == 1 {
 		encryptionKeyStr := crypto.GenerateRandomString(32)
-		encryptionKey, err = crypto.NewFileKey([32]byte([]byte(encryptionKeyStr)))
+		encryptionKey, err = crypto.MakeEncryptionKeyFromBytes([32]byte([]byte(encryptionKeyStr)))
 		if err != nil {
 			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 2: %w", err)
 		}
 	} else if filen.AuthVersion == 3 {
-		encryptionKey, err = crypto.NewFileKey([32]byte(crypto.GenerateRandomBytes(32)))
+		encryptionKey, err = crypto.NewEncryptionKey()
 		if err != nil {
 			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 3: %w", err)
 		}
@@ -307,7 +307,7 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 		LastModified int    `json:"lastModified"`
 		Created      int    `json:"created"`
 		// TODO add hash, which is the hash of unencrypted bytes
-	}{name, size, "text/plain", fu.encryptionKey.ToString(fu.filen.AuthVersion), int(time.Now().Unix()), int(time.Now().Unix())}
+	}{name, size, "text/plain", fu.encryptionKey.ToStringWithAuthVersion(fu.filen.AuthVersion), int(time.Now().Unix()), int(time.Now().Unix())}
 	metadataStr, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, fmt.Errorf("marshal file metadata: %w", err)

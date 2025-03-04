@@ -15,18 +15,18 @@ import (
 
 // File represents a file on the cloud drive.
 type File struct {
-	UUID          string         // the UUID of the cloud item
-	Name          string         // the file name
-	Size          int64          // the file size in bytes
-	MimeType      string         // the MIME type of the file
-	EncryptionKey crypto.FileKey // the key used to encrypt the file data
-	Created       time.Time      // when the file was created
-	LastModified  time.Time      // when the file was last modified
-	ParentUUID    string         // the [Directory.UUID] of the file's parent directory
-	Favorited     bool           // whether the file is marked a favorite
-	Region        string         // the file's storage region
-	Bucket        string         // the file's storage bucket
-	Chunks        int            // how many 1 MiB chunks the file is partitioned into
+	UUID          string               // the UUID of the cloud item
+	Name          string               // the file name
+	Size          int64                // the file size in bytes
+	MimeType      string               // the MIME type of the file
+	EncryptionKey crypto.EncryptionKey // the key used to encrypt the file data
+	Created       time.Time            // when the file was created
+	LastModified  time.Time            // when the file was last modified
+	ParentUUID    string               // the [Directory.UUID] of the file's parent directory
+	Favorited     bool                 // whether the file is marked a favorite
+	Region        string               // the file's storage region
+	Bucket        string               // the file's storage bucket
+	Chunks        int                  // how many 1 MiB chunks the file is partitioned into
 }
 
 // Directory represents a directory on the cloud drive.
@@ -169,7 +169,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 
 		}
 
-		encryptionKey, err := crypto.NewFileKeyFromStr(metadata.Key)
+		encryptionKey, err := crypto.MakeEncryptionKeyFromUnknownStr(metadata.Key)
 		if err != nil {
 			return nil, nil, err
 		}
