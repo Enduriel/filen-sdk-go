@@ -8,7 +8,9 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rsa"
 	"crypto/sha512"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -67,6 +69,18 @@ func getCipherForKey(key [32]byte) (cipher.AEAD, error) {
 		return nil, fmt.Errorf("getCipherForKey: %v", err)
 	}
 	return derivedGcm, nil
+}
+
+// DecryptMeta should be avoided, and Filen.DecryptMeta should be used instead,
+// but this is necessary for RSA Keypair decryption
+func (ms *MasterKeys) DecryptMeta(encrypted EncryptedString) (string, error) {
+	if encrypted[0:8] == "U2FsdGVk" {
+		return ms.DecryptMetaV1(encrypted)
+	}
+	if encrypted[0:3] == "002" {
+		return ms.DecryptMetaV2(encrypted)
+	}
+	return "", fmt.Errorf("unknown metadata format")
 }
 
 type MasterKey struct {
@@ -296,4 +310,40 @@ func (key *EncryptionKey) ToStringWithAuthVersion(authVersion int) string {
 		return hex.EncodeToString(key.Bytes[:])
 	}
 	return string(key.Bytes[:])
+}
+
+func RSAKeyPairFromStrings(privKey string, pubKey string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+	publicKeyDecoded, err := base64.StdEncoding.DecodeString(pubKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding public key: %v", err)
+	}
+	privateKeyDecoded, err := base64.StdEncoding.DecodeString(privKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding private key: %v", err)
+	}
+	publicKeyAny, err := x509.ParsePKIXPublicKey(publicKeyDecoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing public key: %v", err)
+	}
+
+	publicKey, ok := publicKeyAny.(*rsa.PublicKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("parsing public key, failed to cast: %v", err)
+	}
+
+	privateKeyAny, err := x509.ParsePKCS8PrivateKey(privateKeyDecoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing private key: %v", err)
+	}
+
+	privateKey, ok := privateKeyAny.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("parsing private key, failed to cast: %v", err)
+	}
+
+	if !publicKey.Equal(&privateKey.PublicKey) {
+		return nil, nil, fmt.Errorf("public and private key mismatch")
+	}
+
+	return privateKey, publicKey, nil
 }

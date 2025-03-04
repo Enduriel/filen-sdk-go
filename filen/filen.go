@@ -2,6 +2,7 @@
 package filen
 
 import (
+	"crypto/rsa"
 	"encoding/hex"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
@@ -21,6 +22,9 @@ type Filen struct {
 	MasterKeys crypto.MasterKeys
 	DEK        crypto.EncryptionKey
 	KEK        crypto.EncryptionKey
+
+	PrivateKey rsa.PrivateKey
+	PublicKey  rsa.PublicKey
 
 	// BaseFolderUUID is the UUID of the cloud drive's root directory
 	BaseFolderUUID string
@@ -56,6 +60,17 @@ func newV2(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 		return nil, fmt.Errorf("failed to parse master keys: %w", err)
 	}
 
+	// rsa keys
+	privateKeyStr, err := masterKeys.DecryptMeta(response.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+	}
+
+	privateKey, publicKey, err := crypto.RSAKeyPairFromStrings(privateKeyStr, response.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
+	}
+
 	// set up base folder
 	baseFolderResponse, err := c.GetUserBaseFolder()
 	if err != nil {
@@ -66,6 +81,8 @@ func newV2(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 		client:         c,
 		Email:          email,
 		MasterKeys:     masterKeys,
+		PrivateKey:     *privateKey,
+		PublicKey:      *publicKey,
 		BaseFolderUUID: baseFolderResponse.UUID,
 		AuthVersion:    info.AuthVersion,
 	}, nil
@@ -85,6 +102,17 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 		return nil, fmt.Errorf("failed to log in: %w", err)
 	}
 	c := unauthorizedClient.Authorize(response.APIKey)
+
+	// rsa keys
+	privateKeyStr, err := kek.DecryptMeta(response.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+	}
+
+	privateKey, publicKey, err := crypto.RSAKeyPairFromStrings(privateKeyStr, response.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
+	}
 
 	// master keys decryption
 	encryptedKEK := kek.EncryptMeta(hex.EncodeToString(kek.Bytes[:]))
@@ -129,6 +157,8 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 		MasterKeys:     masterKeys,
 		KEK:            *kek,
 		DEK:            *dek,
+		PrivateKey:     *privateKey,
+		PublicKey:      *publicKey,
 		BaseFolderUUID: baseFolderResponse.UUID,
 		AuthVersion:    info.AuthVersion,
 	}, nil
