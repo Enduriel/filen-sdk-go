@@ -147,16 +147,12 @@ func (ms *MasterKeys) decryptMeta(metadata EncryptedString, decryptFunc func(m *
 	return "", &AllKeysFailedError{Errors: errs}
 }
 
-func (ms *MasterKeys) DecryptMeta(metadata EncryptedString) (string, error) {
-	if metadata[0:8] == "U2FsdGVk" {
-		return ms.decryptMeta(metadata, (*MasterKey).DecryptMetaV1)
-	}
-	switch metadata[0:3] {
-	case "002":
-		return ms.decryptMeta(metadata, (*MasterKey).DecryptMetaV2)
-	default:
-		return "", fmt.Errorf("unknown metadata format")
-	}
+func (ms *MasterKeys) DecryptMetaV1(metadata EncryptedString) (string, error) {
+	return ms.decryptMeta(metadata, (*MasterKey).DecryptMetaV1)
+}
+
+func (ms *MasterKeys) DecryptMetaV2(metadata EncryptedString) (string, error) {
+	return ms.decryptMeta(metadata, (*MasterKey).DecryptMetaV2)
 }
 
 func (ms *MasterKeys) EncryptMeta(metadata string) EncryptedString {

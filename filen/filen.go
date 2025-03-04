@@ -136,7 +136,9 @@ func newV3(email, password string, info *client.AuthInfo, unauthorizedClient *cl
 
 func (api *Filen) EncryptMeta(metadata string) crypto.EncryptedString {
 	switch api.AuthVersion {
-	case 1, 2:
+	case 1:
+		panic("todo")
+	case 2:
 		return api.MasterKeys.EncryptMeta(metadata)
 	case 3:
 		return api.DEK.EncryptMeta(metadata)
@@ -146,10 +148,13 @@ func (api *Filen) EncryptMeta(metadata string) crypto.EncryptedString {
 }
 
 func (api *Filen) DecryptMeta(encrypted crypto.EncryptedString) (string, error) {
-	switch api.AuthVersion {
-	case 1, 2:
-		return api.MasterKeys.DecryptMeta(encrypted)
-	case 3:
+	if encrypted[0:8] == "U2FsdGVk" {
+		return api.MasterKeys.DecryptMetaV1(encrypted)
+	}
+	switch encrypted[0:3] {
+	case "002":
+		return api.MasterKeys.DecryptMetaV2(encrypted)
+	case "003":
 		return api.DEK.DecryptMeta(encrypted)
 	default:
 		panic("unsupported version")

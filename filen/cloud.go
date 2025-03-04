@@ -149,7 +149,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// transform files
 	files := make([]*File, 0)
 	for _, file := range directoryContent.Uploads {
-		metadataStr, err := api.MasterKeys.DecryptMeta(file.Metadata)
+		metadataStr, err := api.DecryptMeta(file.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
@@ -193,7 +193,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// transform directories
 	directories := make([]*Directory, 0)
 	for _, directory := range directoryContent.Folders {
-		nameStr, err := api.MasterKeys.DecryptMeta(directory.Name)
+		nameStr, err := api.DecryptMeta(directory.Name)
 		if err != nil {
 			return nil, nil, err
 		}
