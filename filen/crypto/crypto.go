@@ -226,12 +226,12 @@ func DeriveMKAndAuthFromPassword(password string, salt string) (*MasterKey, Deri
 
 type EncryptionKey struct {
 	Bytes  [32]byte
-	cipher cipher.AEAD
+	Cipher cipher.AEAD
 }
 
 func (key *EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 	nonce := [12]byte(GenerateRandomBytes(12))
-	encrypted := key.cipher.Seal(nil, nonce[:], []byte(metadata), nil)
+	encrypted := key.Cipher.Seal(nil, nonce[:], []byte(metadata), nil)
 	return NewEncryptedStringV3(encrypted, nonce)
 }
 
@@ -243,7 +243,7 @@ func (key *EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("decoding nonce: %v", err)
 	}
-	decrypted, err := key.cipher.Open(nil, nonce[:], []byte(metadata[27:]), nil)
+	decrypted, err := key.Cipher.Open(nil, nonce[:], []byte(metadata[27:]), nil)
 	if err != nil {
 		return "", fmt.Errorf("decrypting: %v", err)
 	}
@@ -257,7 +257,7 @@ func MakeEncryptionKeyFromBytes(key [32]byte) (*EncryptionKey, error) {
 	}
 	return &EncryptionKey{
 		Bytes:  key,
-		cipher: c,
+		Cipher: c,
 	}, nil
 }
 
@@ -303,7 +303,7 @@ func MakeEncryptionKeyFromUnknownStr(key string) (*EncryptionKey, error) {
 }
 
 func (key *EncryptionKey) encrypt(nonce []byte, data []byte) []byte {
-	return key.cipher.Seal(data[:0], nonce, data, nil)
+	return key.Cipher.Seal(data[:0], nonce, data, nil)
 }
 
 func (key *EncryptionKey) EncryptData(data []byte) []byte {
@@ -313,7 +313,7 @@ func (key *EncryptionKey) EncryptData(data []byte) []byte {
 }
 
 func (key *EncryptionKey) decrypt(nonce []byte, data []byte) error {
-	data, err := key.cipher.Open(data[:0], nonce, data, nil)
+	data, err := key.Cipher.Open(data[:0], nonce, data, nil)
 	if err != nil {
 		return fmt.Errorf("open: %v", err)
 	}

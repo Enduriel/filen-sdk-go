@@ -219,7 +219,7 @@ func (fu *FileUpload) readChunks(inReader io.Reader, outChunks chan<- Chunk) (in
 				return 0, fmt.Errorf("read chunk %d: %w", chunkID, err)
 			}
 
-			chunk := make([]byte, n)
+			chunk := make([]byte, n, n+fu.encryptionKey.Cipher.Overhead())
 			size += n
 			copy(chunk, buffer[:n])
 			select {
