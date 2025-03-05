@@ -15,7 +15,7 @@ type v3uploadResponse struct {
 }
 
 // PostV3Upload uploads a file chunk to the storage backend.
-func (client *Client) PostV3Upload(uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (string, string, error) {
+func (c *Client) PostV3Upload(uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (string, string, error) {
 	startTime := time.Now()
 	// build request
 	fmt.Printf("started uploading chunk %d\n", chunkIdx)
@@ -27,12 +27,12 @@ func (client *Client) PostV3Upload(uuid string, chunkIdx int, parentUUID string,
 	}
 	method := "POST"
 	// Can't use the standard Client.RequestData because our request body is raw bytes
-	req, err := client.buildReaderRequest(method, url, bytes.NewBuffer(data))
+	req, err := c.buildReaderRequest(method, url, bytes.NewBuffer(data))
 	if err != nil {
 		return "", "", err
 	}
 
-	response, err := handleRequest(req, &client.httpClient, method, url)
+	response, err := handleRequest(req, &c.httpClient, method, url)
 	if err != nil {
 		return "", "", err
 	}

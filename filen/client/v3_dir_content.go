@@ -33,9 +33,9 @@ type V3DirContentResponse struct {
 }
 
 // PostV3DirContent calls /v3/dir/content.
-func (client *Client) PostV3DirContent(uuid string) (*V3DirContentResponse, error) {
+func (c *Client) PostV3DirContent(uuid string) (*V3DirContentResponse, error) {
 	directoryContent := &V3DirContentResponse{}
-	_, err := client.RequestData("POST", GatewayURL("/v3/dir/content"), v3dirContentRequest{
+	_, err := c.RequestData("POST", GatewayURL("/v3/dir/content"), v3dirContentRequest{
 		UUID: uuid,
 	}, directoryContent)
 	return directoryContent, err

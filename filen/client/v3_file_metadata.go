@@ -12,8 +12,8 @@ type v3FileMetadataRequest struct {
 	Metadata   crypto.EncryptedString `json:"metadata"`
 }
 
-func (client *Client) PostV3FileMetadata(uuid string, name crypto.EncryptedString, nameHashed string, metadata crypto.EncryptedString) error {
-	_, err := client.Request("POST", GatewayURL("/v3/file/metadata"), v3FileMetadataRequest{
+func (c *Client) PostV3FileMetadata(uuid string, name crypto.EncryptedString, nameHashed string, metadata crypto.EncryptedString) error {
+	_, err := c.Request("POST", GatewayURL("/v3/file/metadata"), v3FileMetadataRequest{
 		UUID:       uuid,
 		Name:       name,
 		NameHashed: nameHashed,

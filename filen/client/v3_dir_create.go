@@ -14,9 +14,9 @@ type V3CreateDirResponse struct {
 }
 
 // PostV3DirCreate calls /v3/dir/create
-func (client *Client) PostV3DirCreate(uuid string, name crypto.EncryptedString, nameHashed string, parentUUID string) (*V3CreateDirResponse, error) {
+func (c *Client) PostV3DirCreate(uuid string, name crypto.EncryptedString, nameHashed string, parentUUID string) (*V3CreateDirResponse, error) {
 	response := &V3CreateDirResponse{}
-	_, err := client.RequestData("POST", GatewayURL("/v3/dir/create"), v3createDirReqeuest{
+	_, err := c.RequestData("POST", GatewayURL("/v3/dir/create"), v3createDirReqeuest{
 		UUID:       uuid,
 		Name:       name,
 		NameHashed: nameHashed,
