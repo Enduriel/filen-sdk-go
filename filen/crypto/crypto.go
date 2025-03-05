@@ -326,7 +326,7 @@ func (key *EncryptionKey) DecryptData(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return data[12:], nil
+	return data[12 : len(data)-key.Cipher.Overhead()], nil
 }
 
 func (key *EncryptionKey) ToStringWithAuthVersion(authVersion int) string {
