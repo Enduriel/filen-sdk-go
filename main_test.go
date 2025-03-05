@@ -1,6 +1,7 @@
 package filen_sdk_go
 
 import (
+	"bytes"
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
 	filenio "github.com/FilenCloudDienste/filen-sdk-go/filen/io"
@@ -116,13 +117,20 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Download", func(t *testing.T) {
-		downloadFile, err := os.Create("downloaded/large_sample-3mb.txt")
+		err := filen.DownloadToPath(file, "downloaded/large_sample-3mb.txt")
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = filen.DownloadFile(file, downloadFile)
+		downloadedFile, err := os.Open("downloaded/large_sample-3mb.txt")
 		if err != nil {
 			t.Fatal(err)
+		}
+		eq, err := assertFilesEqual(osFile, downloadedFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !eq {
+			t.Fatalf("Uploaded \n%#v\n and downloaded file contents did not match", file)
 		}
 	})
 
@@ -160,4 +168,38 @@ func writeTestFiles() error {
 		return err
 	}
 	return nil
+}
+
+func assertFilesEqual(f1 *os.File, f2 *os.File) (bool, error) {
+	const chunkSize = 1024
+	b1 := make([]byte, chunkSize)
+	b2 := make([]byte, chunkSize)
+	i := 0
+	_, err1 := f1.Seek(0, io.SeekStart)
+	_, err2 := f2.Seek(0, io.SeekStart)
+
+	if err1 != nil || err2 != nil {
+		return false, fmt.Errorf("seek error: %v, %v", err1, err2)
+	}
+	for {
+		i++
+		_, err1 = f1.Read(b1)
+		_, err2 = f2.Read(b2)
+
+		if err1 != nil || err2 != nil {
+			if err1 == io.EOF && err2 == io.EOF {
+				return true, nil
+			} else if err1 == io.EOF || err2 == io.EOF {
+				return false, nil
+			} else {
+				return false, fmt.Errorf("read error: %v, %v", err1, err2)
+			}
+		}
+
+		if !bytes.Equal(b1, b2) {
+			fmt.Printf("Chunk %d did not match\n", i)
+			fmt.Printf("b1: %v\nb2: %v\n", b1, b2)
+			return false, nil
+		}
+	}
 }

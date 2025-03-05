@@ -117,7 +117,7 @@ func (fd *fileDownload) writeChunks(in <-chan Chunk, ws io.WriteSeeker) error {
 	}
 }
 
-func (api *Filen) DownloadFile(file *File, ws io.WriteSeeker) error {
+func (api *Filen) downloadFile(file *File, ws io.WriteSeeker) error {
 	g, ctx := errgroup.WithContext(context.Background())
 	fd := newFileDownload(api, file, ctx)
 	downloadedChunks := make(chan Chunk, maxDownloadedBuffer)
