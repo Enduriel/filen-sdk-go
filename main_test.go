@@ -3,9 +3,11 @@ package filen_sdk_go
 import (
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
+	filenio "github.com/FilenCloudDienste/filen-sdk-go/filen/io"
 	"github.com/joho/godotenv"
 	"io"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -85,14 +87,17 @@ func TestFileActions(t *testing.T) {
 	osFile, err := os.Open("test_files/large_sample-3mb.txt")
 
 	uploadsDirUUID := filen.BaseFolderUUID
-	fileName := "large_sample-3mb.txt"
+	uploadFileInfo, err := filenio.MakeInfoFromFile(osFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var (
-		file      *sdk.File
-		foundFile *sdk.File
+		file *sdk.File
 	)
 
 	if !t.Run("Upload", func(t *testing.T) {
-		file, err = filen.UploadFile(fileName, uploadsDirUUID, osFile)
+		file, err = filen.UploadFile(uploadFileInfo, uploadsDirUUID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,15 +106,13 @@ func TestFileActions(t *testing.T) {
 	}
 
 	t.Run("Find", func(t *testing.T) {
-		f, _, err := filen.FindItem("/large_sample-3mb.txt", false)
+		foundFile, _, err := filen.FindItem("/large_sample-3mb.txt", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		foundFile = f // this shouldn't be necessary and should be removed when below is fixed
-		// TODO fix as this this failing for some reason
-		//if !reflect.DeepEqual(file, foundFile) {
-		//	t.Fatalf("Uploaded \n%#v\n and Downloaded \n%#v\n file info did not match", file, foundFile)
-		//}
+		if !reflect.DeepEqual(file, foundFile) {
+			t.Fatalf("Uploaded \n%#v\n and Downloaded \n%#v\n file info did not match", file, foundFile)
+		}
 	})
 
 	t.Run("Download", func(t *testing.T) {
@@ -117,7 +120,7 @@ func TestFileActions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = filen.DownloadFile(foundFile, downloadFile)
+		err = filen.DownloadFile(file, downloadFile)
 		if err != nil {
 			t.Fatal(err)
 		}

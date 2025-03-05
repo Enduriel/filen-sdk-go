@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	filenio "github.com/FilenCloudDienste/filen-sdk-go/filen/io"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 	"io"
 	"strconv"
-	"time"
 )
 
 const (
@@ -156,6 +156,7 @@ type FileUpload struct {
 	filen         *Filen
 	// needed for file metadata
 	ParentUUID string
+	fileInfo   filenio.FileInfo
 }
 
 type Chunk struct {
@@ -163,7 +164,7 @@ type Chunk struct {
 	Data  []byte
 }
 
-func NewFileUpload(filen *Filen, parentUUID string, ctx context.Context) (*FileUpload, error) {
+func NewFileUpload(filen *Filen, fileInfo filenio.FileInfo, parentUUID string, ctx context.Context) (*FileUpload, error) {
 
 	// TODO check if this is the correct approach
 	var (
@@ -187,11 +188,12 @@ func NewFileUpload(filen *Filen, parentUUID string, ctx context.Context) (*FileU
 
 	return &FileUpload{
 		UUID:          uuid.New().String(),
-		ParentUUID:    parentUUID,
+		fileInfo:      fileInfo,
 		uploadKey:     crypto.GenerateRandomString(32),
 		encryptionKey: *encryptionKey,
 		ctx:           ctx,
 		filen:         filen,
+		ParentUUID:    parentUUID,
 	}, nil
 }
 
@@ -298,25 +300,32 @@ func (fu *FileUpload) uploadChunks(in <-chan Chunk) (string, string, error) {
 	return region, bucket, g.Wait()
 }
 
-func (fu *FileUpload) completeUpload(name string, bucket string, region string, size int) (*File, error) {
-	metadata := struct {
-		Name         string `json:"name"`
-		Size         int    `json:"size"`
-		MimeType     string `json:"mime"`
-		Key          string `json:"key"`
-		LastModified int    `json:"lastModified"`
-		Created      int    `json:"created"`
-		// TODO add hash, which is the hash of unencrypted bytes
-	}{name, size, "text/plain", fu.encryptionKey.ToStringWithAuthVersion(fu.filen.AuthVersion), int(time.Now().Unix()), int(time.Now().Unix())}
+type FileMetadata struct {
+	Name         string `json:"name"`
+	Size         int    `json:"size"`
+	MimeType     string `json:"mime"`
+	Key          string `json:"key"`
+	LastModified int    `json:"lastModified"`
+	Created      int    `json:"created"`
+}
+
+func (fu *FileUpload) completeUpload(bucket string, region string, size int) (*File, error) {
+	metadata := FileMetadata{
+		Name:         fu.fileInfo.Name,
+		Size:         size,
+		MimeType:     fu.fileInfo.MimeType,
+		Key:          fu.encryptionKey.ToStringWithAuthVersion(fu.filen.AuthVersion),
+		LastModified: int(fu.fileInfo.LastModified.UnixMilli()),
+		Created:      int(fu.fileInfo.Created.UnixMilli()),
+	}
 	metadataStr, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, fmt.Errorf("marshal file metadata: %w", err)
 	}
 
-	metadataEncrypted := fu.filen.EncryptMeta(string(metadataStr))
-	nameEncrypted := fu.filen.EncryptMeta(name)
+	nameEncrypted := fu.filen.EncryptMeta(fu.fileInfo.Name)
 	// TODO consider seeding this hash with the DEK
-	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(name)))
+	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(fu.fileInfo.Name)))
 
 	numChunks := (size / chunkSize) + 1
 	response, err := fu.filen.client.PostV3UploadDone(client.V3UploadDoneRequest{
@@ -325,10 +334,10 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 		NameHashed: nameHashed,
 		Size:       strconv.Itoa(size),
 		Chunks:     numChunks,
-		Metadata:   metadataEncrypted,
-		MimeType:   "text/plain", // TODO figure out mime types
+		Metadata:   fu.filen.EncryptMeta(string(metadataStr)),
+		MimeType:   fu.filen.EncryptMeta(fu.fileInfo.MimeType),
 		Rm:         crypto.GenerateRandomString(32),
-		Version:    2,
+		Version:    fu.filen.AuthVersion,
 		UploadKey:  fu.uploadKey,
 	})
 
@@ -338,24 +347,23 @@ func (fu *FileUpload) completeUpload(name string, bucket string, region string, 
 
 	return &File{
 		UUID:          fu.UUID,
-		Name:          name,
-		Size:          int64(size),
-		MimeType:      "application/octet-stream", //TODO correct mime type
+		Name:          fu.fileInfo.Name,
+		Size:          size,
+		MimeType:      fu.fileInfo.MimeType,
 		EncryptionKey: fu.encryptionKey,
-		Created:       time.Now(), //TODO really?
-		LastModified:  time.Now(),
+		Created:       fu.fileInfo.Created,
+		LastModified:  fu.fileInfo.LastModified,
 		ParentUUID:    fu.ParentUUID,
 		Favorited:     false,
 		Region:        region,
 		Bucket:        bucket,
 		Chunks:        response.Chunks,
 	}, nil
-
 }
 
-func (api *Filen) UploadFile(fileName string, parentUUID string, data io.Reader) (*File, error) {
+func (api *Filen) UploadFile(fileInfo filenio.FileInfo, parentUUID string) (*File, error) {
 	eg, ctx := errgroup.WithContext(context.Background())
-	fileUpload, err := NewFileUpload(api, parentUUID, ctx)
+	fileUpload, err := NewFileUpload(api, fileInfo, parentUUID, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("new file upload: %w", err)
 	}
@@ -367,7 +375,7 @@ func (api *Filen) UploadFile(fileName string, parentUUID string, data io.Reader)
 		bucket string
 	)
 	eg.Go(func() error {
-		s, err := fileUpload.readChunks(data, readChunks)
+		s, err := fileUpload.readChunks(fileInfo.Data, readChunks)
 		if err != nil {
 			return fmt.Errorf("read chunks: %w", err)
 		}
@@ -393,7 +401,7 @@ func (api *Filen) UploadFile(fileName string, parentUUID string, data io.Reader)
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
-	file, err := fileUpload.completeUpload(fileName, bucket, region, size)
+	file, err := fileUpload.completeUpload(bucket, region, size)
 	if err != nil {
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}

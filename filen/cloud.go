@@ -17,7 +17,7 @@ import (
 type File struct {
 	UUID          string               // the UUID of the cloud item
 	Name          string               // the file name
-	Size          int64                // the file size in bytes
+	Size          int                  // the file size in bytes
 	MimeType      string               // the MIME type of the file
 	EncryptionKey crypto.EncryptionKey // the key used to encrypt the file data
 	Created       time.Time            // when the file was created
@@ -153,13 +153,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
-		var metadata struct {
-			Name         string `json:"name"`
-			Size         int    `json:"size"`
-			MimeType     string `json:"mime"`
-			Key          string `json:"key"`
-			LastModified int    `json:"lastModified"`
-		}
+		var metadata FileMetadata
 		err = json.Unmarshal([]byte(metadataStr), &metadata)
 		if err != nil {
 			return nil, nil, err
@@ -168,7 +162,6 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 		if len(metadata.Key) != 32 {
 
 		}
-
 		encryptionKey, err := crypto.MakeEncryptionKeyFromUnknownStr(metadata.Key)
 		if err != nil {
 			return nil, nil, err
@@ -177,10 +170,10 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 		files = append(files, &File{
 			UUID:          file.UUID,
 			Name:          metadata.Name,
-			Size:          int64(metadata.Size),
+			Size:          metadata.Size,
 			MimeType:      metadata.MimeType,
 			EncryptionKey: *encryptionKey,
-			Created:       util.TimestampToTime(int64(file.Timestamp)),
+			Created:       util.TimestampToTime(int64(metadata.Created)),
 			LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
 			ParentUUID:    file.Parent,
 			Favorited:     file.Favorited == 1,

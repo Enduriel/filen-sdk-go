@@ -11,7 +11,7 @@ func TimestampToTime(timestamp int64) time.Time {
 	now := time.Now().Unix()
 	if math.Abs(float64(now-timestamp)) < math.Abs(float64(now-timestamp*1000)) {
 		// ms timestamps
-		return time.Unix(timestamp/1000, 0)
+		return time.UnixMilli(timestamp)
 	} else {
 		// (legacy) seconds timestamps
 		return time.Unix(timestamp, 0)
