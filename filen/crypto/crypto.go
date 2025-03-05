@@ -111,7 +111,31 @@ func (m *MasterKey) EncryptMeta(metadata string) EncryptedString {
 }
 
 func (m *MasterKey) DecryptMetaV1(metadata EncryptedString) (string, error) {
-	panic("unimplemented")
+	decoded, err := base64.StdEncoding.DecodeString(string(metadata))
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64: %w", err)
+	}
+	salt := decoded[8:16]
+	cipherText := decoded[16:]
+
+	keyBytes, ivBytes := deriveKeyAndIV(m.DerivedBytes[:], salt, 32, 16)
+
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	mode := cipher.NewCBCDecrypter(block, ivBytes)
+
+	plaintext := make([]byte, len(cipherText))
+	mode.CryptBlocks(plaintext, cipherText)
+
+	paddingLen := int(plaintext[len(plaintext)-1])
+	if paddingLen > aes.BlockSize || paddingLen <= 0 {
+		return "", fmt.Errorf("invalid padding size")
+	}
+
+	return string(plaintext[:len(plaintext)-paddingLen]), nil
 }
 
 func (m *MasterKey) DecryptMetaV2(metadata EncryptedString) (string, error) {

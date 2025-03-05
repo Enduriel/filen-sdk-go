@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha512"
 	"golang.org/x/crypto/pbkdf2"
@@ -71,4 +72,26 @@ func runAES256GCMEncryption(key []byte, nonce []byte, plaintext []byte) ([]byte,
 	var result []byte
 	result = gcm.Seal(nil, nonce, plaintext, nil)
 	return result, nil
+}
+
+// Simplified EVP_BytesToKey implementation
+func deriveKeyAndIV(key, salt []byte, keyLen, ivLen int) ([]byte, []byte) {
+	keyAndIV := make([]byte, keyLen+ivLen)
+
+	data := make([]byte, 0, 16+len(key))
+	for offset := 0; offset < keyLen+ivLen; {
+		hash := md5.New()
+		hash.Write(data)
+		hash.Write(key)
+		hash.Write(salt)
+		digest := hash.Sum(nil)
+
+		copyLen := min(len(digest), keyLen+ivLen-offset)
+		copy(keyAndIV[offset:], digest[:copyLen])
+		offset += copyLen
+
+		data = digest
+	}
+
+	return keyAndIV[:keyLen], keyAndIV[keyLen:]
 }
