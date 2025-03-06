@@ -2,6 +2,8 @@ package filen
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,6 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -324,8 +327,7 @@ func (fu *FileUpload) completeUpload(bucket string, region string, size int) (*F
 	}
 
 	nameEncrypted := fu.encryptionKey.EncryptMeta(fu.fileInfo.Name)
-	// TODO consider seeding this hash with the DEK
-	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(fu.fileInfo.Name)))
+	nameHashed := fu.filen.HashFileName(fu.fileInfo.Name)
 
 	numChunks := (size / chunkSize) + 1
 	response, err := fu.filen.client.PostV3UploadDone(client.V3UploadDoneRequest{
@@ -409,5 +411,22 @@ func (api *Filen) UploadFile(fileInfo filenio.FileInfo, parentUUID string) (*Fil
 		return file, nil
 	} else {
 		return nil, err
+	}
+}
+
+func (api *Filen) HashFileName(name string) string {
+	name = strings.ToLower(name)
+	switch api.AuthVersion {
+	case 1, 2:
+		outerHasher := sha1.New()
+		innerHasher := sha256.New()
+		innerHasher.Write([]byte(name))
+		outerHasher.Write(innerHasher.Sum(nil))
+		return hex.EncodeToString(outerHasher.Sum(nil))
+	default:
+		hasher := sha256.New()
+		hasher.Write(api.DEK.Bytes[:])
+		hasher.Write([]byte(name))
+		return hex.EncodeToString(hasher.Sum(nil))
 	}
 }

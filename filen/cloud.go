@@ -1,7 +1,6 @@
 package filen
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -231,7 +230,7 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 	metadataEncrypted := api.MasterKeys.EncryptMeta(string(metadataStr))
 
 	// hash name
-	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(name)))
+	nameHashed := api.HashFileName(name)
 
 	// send
 	response, err := api.client.PostV3DirCreate(directoryUUID, metadataEncrypted, nameHashed, parentUUID)
