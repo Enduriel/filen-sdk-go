@@ -19,5 +19,8 @@ func (c *Client) PostV3FileMetadata(uuid string, name crypto.EncryptedString, na
 		NameHashed: nameHashed,
 		Metadata:   metadata,
 	})
-	return fmt.Errorf("post v3 file metadata: %w", err)
+	if err != nil {
+		return fmt.Errorf("post v3 file metadata: %w", err)
+	}
+	return nil
 }
