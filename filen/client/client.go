@@ -148,6 +148,10 @@ func handleRequest(request *http.Request, httpClient *http.Client, method string
 	if err != nil {
 		return nil, err
 	}
+	err = apiRes.CheckError()
+	if err != nil {
+		return nil, err
+	}
 	//fmt.Printf("Request %s %s took %s\n", method, url, time.Since(startTime))
 	return apiRes, nil
 }
@@ -215,6 +219,13 @@ type aPIResponse struct {
 	Message string          `json:"message"` // additional information
 	Code    string          `json:"code"`    // a status code
 	Data    json.RawMessage `json:"data"`    // response body, or nil
+}
+
+func (res *aPIResponse) CheckError() error {
+	if !res.Status {
+		return fmt.Errorf("response error: %s %s", res.Message, res.Code)
+	}
+	return nil
 }
 
 func (res *aPIResponse) String() string {
