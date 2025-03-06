@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
@@ -213,9 +212,6 @@ func (fu *FileUpload) readChunks(inReader io.Reader, outChunks chan<- Chunk) (in
 		default:
 			n, err := inReader.Read(buffer)
 			if err == io.EOF {
-				if size == 0 {
-					return 0, errors.New("empty uploads are not supported")
-				}
 				return size, nil
 			}
 			if err != nil {
@@ -268,6 +264,10 @@ func (fu *FileUpload) uploadChunks(in <-chan Chunk) (string, string, error) {
 	g, ctx := errgroup.WithContext(fu.ctx)
 
 	firstChunk := <-in
+	if firstChunk.Data == nil {
+		// zero sized file
+		return "", "", nil
+	}
 	var (
 		region string
 		bucket string
@@ -363,6 +363,52 @@ func (fu *FileUpload) completeUpload(bucket string, region string, size int) (*F
 	}, nil
 }
 
+func (api *Filen) uploadEmptyFile(fu *FileUpload) (*File, error) {
+	metadata := FileMetadata{
+		Name:         fu.fileInfo.Name,
+		Size:         0,
+		MimeType:     fu.fileInfo.MimeType,
+		Key:          fu.encryptionKey.ToStringWithAuthVersion(api.AuthVersion),
+		LastModified: int(fu.fileInfo.LastModified.UnixMilli()),
+		Created:      int(fu.fileInfo.Created.UnixMilli()),
+	}
+
+	metadataStr, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("marshal file metadata: %w", err)
+	}
+
+	_, err = api.client.PostV3UploadEmpty(client.V3UploadEmptyRequest{
+		UUID:       fu.UUID,
+		Name:       api.EncryptMeta(fu.fileInfo.Name),
+		NameHashed: api.HashFileName(fu.fileInfo.Name),
+		Size:       "0",
+		Parent:     fu.ParentUUID,
+		MimeType:   api.EncryptMeta(fu.fileInfo.MimeType),
+		Metadata:   api.EncryptMeta(string(metadataStr)),
+		Version:    api.AuthVersion,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("upload empty file: %w", err)
+	}
+
+	return &File{
+		UUID:          fu.UUID,
+		Name:          fu.fileInfo.Name,
+		Size:          0,
+		MimeType:      fu.fileInfo.MimeType,
+		EncryptionKey: fu.encryptionKey,
+		Created:       fu.fileInfo.Created,
+		LastModified:  fu.fileInfo.LastModified,
+		ParentUUID:    fu.ParentUUID,
+		Favorited:     false,
+		Region:        "",
+		Bucket:        "",
+		Chunks:        0,
+	}, nil
+}
+
 func (api *Filen) UploadFile(fileInfo filenio.FileInfo, parentUUID string) (*File, error) {
 	eg, ctx := errgroup.WithContext(context.Background())
 	fileUpload, err := NewFileUpload(api, fileInfo, parentUUID, ctx)
@@ -402,6 +448,9 @@ func (api *Filen) UploadFile(fileInfo filenio.FileInfo, parentUUID string) (*Fil
 
 	if err := eg.Wait(); err != nil {
 		return nil, err
+	}
+	if size == 0 {
+		return api.uploadEmptyFile(fileUpload)
 	}
 	file, err := fileUpload.completeUpload(bucket, region, size)
 	if err != nil {

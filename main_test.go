@@ -85,6 +85,61 @@ func TestReadDirectories(t *testing.T) {
 	}
 }
 
+func TestEmptyFileActions(t *testing.T) {
+	osFile, err := os.Open("test_files/empty.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploadFileInfo, err := filenio.MakeInfoFromFile(osFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file *sdk.File
+
+	if !t.Run("Upload", func(t *testing.T) {
+		file, err = filen.UploadFile(uploadFileInfo, filen.BaseFolderUUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}) {
+		return
+	}
+
+	t.Run("Find", func(t *testing.T) {
+		foundFile, _, err := filen.FindItem("/empty.txt", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if foundFile.Size != 0 {
+			t.Fatalf("File size is not zero: %v", foundFile.Size)
+		}
+	})
+
+	t.Run("Download", func(t *testing.T) {
+		err = filen.DownloadToPath(file, "downloaded/empty.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		downloadedFile, err := os.Open("downloaded/empty.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		fileData, err := io.ReadAll(downloadedFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(fileData) != 0 {
+			t.Fatalf("File size is not zero: %v", len(fileData))
+		}
+	})
+	t.Run("Trash", func(t *testing.T) {
+		err = filen.TrashFile(file.UUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestFileActions(t *testing.T) {
 	osFile, err := os.Open("test_files/large_sample-3mb.txt")
 
