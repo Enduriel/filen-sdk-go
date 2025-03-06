@@ -77,7 +77,7 @@ SegmentsLoop:
 
 		files, directories, err := api.ReadDirectory(currentUUID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("read directory: %w", err)
 		}
 		if !requireDirectory {
 			for _, file := range files {
@@ -142,7 +142,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// fetch directory content
 	directoryContent, err := api.client.PostV3DirContent(uuid)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("ReadDirectory fetching directory: %w", err)
 	}
 
 	// transform files
@@ -155,7 +155,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 		var metadata FileMetadata
 		err = json.Unmarshal([]byte(metadataStr), &metadata)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling metadata: %v", err)
 		}
 
 		if len(metadata.Key) != 32 {
@@ -163,7 +163,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 		}
 		encryptionKey, err := crypto.MakeEncryptionKeyFromUnknownStr(metadata.Key)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("ReadDirectory creating encryption key: %v", err)
 		}
 
 		files = append(files, &File{
@@ -187,14 +187,14 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	for _, directory := range directoryContent.Folders {
 		nameStr, err := api.DecryptMeta(directory.Name)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("ReadDirectory decrypting name: %v", err)
 		}
 		var name struct {
 			Name string `json:"name"`
 		}
 		err = json.Unmarshal([]byte(nameStr), &name)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling name: %v", err)
 		}
 
 		directories = append(directories, &Directory{
