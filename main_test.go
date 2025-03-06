@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 )
 
 var filen *sdk.Filen
@@ -105,6 +106,16 @@ func TestFileActions(t *testing.T) {
 	}) {
 		return
 	}
+
+	t.Run("ChangeMeta", func(t *testing.T) {
+		file.Created = file.Created.Add(time.Second)
+		file.LastModified = file.LastModified.Add(time.Second)
+
+		err = filen.UpdateMeta(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 
 	t.Run("Find", func(t *testing.T) {
 		foundFile, _, err := filen.FindItem("/large_sample-3mb.txt", false)

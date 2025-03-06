@@ -1,6 +1,7 @@
 package filen
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -34,6 +35,30 @@ func (api *Filen) DownloadToPath(file *File, downloadPath string) error {
 	if err != nil {
 		_ = os.Remove(fName)
 		return fmt.Errorf("rename file: %w", err)
+	}
+	return nil
+}
+
+func (api *Filen) UpdateMeta(file *File) error {
+	metaData := FileMetadata{
+		Name:         file.Name,
+		Size:         file.Size,
+		MimeType:     file.MimeType,
+		Key:          file.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
+		LastModified: int(file.LastModified.UnixMilli()),
+		Created:      int(file.Created.UnixMilli()),
+	}
+	metadataStr, err := json.Marshal(metaData)
+	if err != nil {
+		return fmt.Errorf("marshal file metadata: %w", err)
+	}
+	metadataEncrypted := api.EncryptMeta(string(metadataStr))
+	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
+	nameHashed := api.HashFileName(file.Name)
+
+	err = api.client.PostV3FileMetadata(file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
+	if err != nil {
+		return fmt.Errorf("post v3 file metadata: %w", err)
 	}
 	return nil
 }
