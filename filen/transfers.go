@@ -323,7 +323,7 @@ func (fu *FileUpload) completeUpload(bucket string, region string, size int) (*F
 		return nil, fmt.Errorf("marshal file metadata: %w", err)
 	}
 
-	nameEncrypted := fu.filen.EncryptMeta(fu.fileInfo.Name)
+	nameEncrypted := fu.encryptionKey.EncryptMeta(fu.fileInfo.Name)
 	// TODO consider seeding this hash with the DEK
 	nameHashed := hex.EncodeToString(crypto.RunSHA521([]byte(fu.fileInfo.Name)))
 
