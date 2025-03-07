@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 //   - /def
 //   - /uploads
 func TestReadDirectories(t *testing.T) {
-	files, dirs, err := filen.ReadDirectory(filen.BaseFolderUUID)
+	files, dirs, err := filen.ReadDirectory(context.Background(), filen.BaseFolderUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestEmptyFileActions(t *testing.T) {
 	}
 
 	t.Run("Find", func(t *testing.T) {
-		foundFile, _, err := filen.FindItem("/empty.txt", false)
+		foundFile, _, err := filen.FindItem(context.Background(), "/empty.txt", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +119,7 @@ func TestEmptyFileActions(t *testing.T) {
 	})
 
 	t.Run("Download", func(t *testing.T) {
-		err = filen.DownloadToPath(file, "downloaded/empty.txt")
+		err = filen.DownloadToPath(context.Background(), file, "downloaded/empty.txt")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -136,7 +136,7 @@ func TestEmptyFileActions(t *testing.T) {
 		}
 	})
 	t.Run("Trash", func(t *testing.T) {
-		err = filen.TrashFile(file.UUID)
+		err = filen.TrashFile(context.Background(), file.UUID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,7 +177,7 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Find", func(t *testing.T) {
-		foundFile, _, err := filen.FindItem("/"+fileName, false)
+		foundFile, _, err := filen.FindItem(context.Background(), "/"+fileName, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -188,7 +188,7 @@ func TestFileActions(t *testing.T) {
 
 	t.Run("Download", func(t *testing.T) {
 		downloadPath := "downloaded/" + fileName
-		err := filen.DownloadToPath(file, downloadPath)
+		err := filen.DownloadToPath(context.Background(), file, downloadPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -206,7 +206,7 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Trash", func(t *testing.T) {
-		err = filen.TrashFile(file.UUID)
+		err = filen.TrashFile(context.Background(), file.UUID)
 		if err != nil {
 			t.Fatal(err)
 		}

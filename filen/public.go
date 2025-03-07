@@ -13,7 +13,7 @@ import (
 // The file is first downloaded to a temporary file in the same directory,
 // then renamed to the final path. If an error occurs during download or rename,
 // the temporary file is removed.
-func (api *Filen) DownloadToPath(file *File, downloadPath string) error {
+func (api *Filen) DownloadToPath(ctx context.Context, file *File, downloadPath string) error {
 	downloadDir := path.Dir(downloadPath)
 	// needs to be removed or renamed
 	f, err := os.CreateTemp(downloadDir, fmt.Sprintf("%s-download-*.tmp", file.Name))
@@ -21,7 +21,6 @@ func (api *Filen) DownloadToPath(file *File, downloadPath string) error {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	fName := f.Name()
-	ctx := context.Background()
 	_, err = f.ReadFrom(api.GetDownloadReader(ctx, file))
 	errClose := f.Close()
 	if err != nil {

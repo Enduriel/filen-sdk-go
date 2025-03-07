@@ -102,11 +102,11 @@ type Directory struct {
 // FindItemUUID finds a cloud item by its path and returns its UUID.
 // Returns an empty string if none was found.
 // Use this instead of FindItem to correctly handle paths pointing to the base directory.
-func (api *Filen) FindItemUUID(path string, requireDirectory bool) (string, error) {
+func (api *Filen) FindItemUUID(ctx context.Context, path string, requireDirectory bool) (string, error) {
 	if len(strings.Join(strings.Split(path, "/"), "")) == 0 { // empty path
 		return api.BaseFolderUUID, nil
 	} else {
-		file, directory, err := api.FindItem(path, requireDirectory)
+		file, directory, err := api.FindItem(ctx, path, requireDirectory)
 		if err != nil {
 			return "", err
 		}
@@ -123,7 +123,7 @@ func (api *Filen) FindItemUUID(path string, requireDirectory bool) (string, erro
 // FindItem find a cloud item by its path and returns it (either the File or the Directory will be returned).
 // Set requireDirectory to differentiate between files and directories with the same path (otherwise, the file will be found).
 // Returns nil for both File and Directory if none was found.
-func (api *Filen) FindItem(path string, requireDirectory bool) (*File, *Directory, error) {
+func (api *Filen) FindItem(ctx context.Context, path string, requireDirectory bool) (*File, *Directory, error) {
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
 		return nil, nil, fmt.Errorf("no segments in path %s", path)
@@ -136,7 +136,7 @@ SegmentsLoop:
 			continue
 		}
 
-		files, directories, err := api.ReadDirectory(currentUUID)
+		files, directories, err := api.ReadDirectory(ctx, currentUUID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("read directory: %w", err)
 		}
@@ -164,7 +164,7 @@ SegmentsLoop:
 
 // FindDirectoryOrCreate finds a cloud directory by its path and returns its UUID.
 // If the directory cannot be found, it (and all non-existent parent directories) will be created.
-func (api *Filen) FindDirectoryOrCreate(path string) (string, error) {
+func (api *Filen) FindDirectoryOrCreate(ctx context.Context, path string) (string, error) {
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
 		return api.BaseFolderUUID, nil
@@ -177,7 +177,7 @@ SegmentsLoop:
 			continue
 		}
 
-		_, directories, err := api.ReadDirectory(currentUUID)
+		_, directories, err := api.ReadDirectory(ctx, currentUUID)
 		if err != nil {
 			return "", err
 		}
@@ -189,7 +189,7 @@ SegmentsLoop:
 			}
 		}
 		// create directory
-		directory, err := api.CreateDirectory(currentUUID, segment)
+		directory, err := api.CreateDirectory(ctx, currentUUID, segment)
 		if err != nil {
 			return "", err
 		}
@@ -199,9 +199,9 @@ SegmentsLoop:
 }
 
 // ReadDirectory fetches the files and directories that are children of a directory (specified by UUID).
-func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
+func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*Directory, error) {
 	// fetch directory content
-	directoryContent, err := api.client.PostV3DirContent(context.Background(), uuid)
+	directoryContent, err := api.client.PostV3DirContent(ctx, uuid)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ReadDirectory fetching directory: %w", err)
 	}
@@ -274,12 +274,12 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 }
 
 // TrashFile moves a file to trash.
-func (api *Filen) TrashFile(uuid string) error {
-	return api.client.PostV3FileTrash(context.Background(), uuid)
+func (api *Filen) TrashFile(ctx context.Context, uuid string) error {
+	return api.client.PostV3FileTrash(ctx, uuid)
 }
 
 // CreateDirectory creates a new directory.
-func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, error) {
+func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name string) (*Directory, error) {
 	directoryUUID := uuid.New().String()
 
 	// encrypt metadata
@@ -296,7 +296,7 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 	nameHashed := api.HashFileName(name)
 
 	// send
-	response, err := api.client.PostV3DirCreate(context.Background(), directoryUUID, metadataEncrypted, nameHashed, parentUUID)
+	response, err := api.client.PostV3DirCreate(ctx, directoryUUID, metadataEncrypted, nameHashed, parentUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -311,6 +311,6 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 }
 
 // TrashDirectory moves a directory to trash.
-func (api *Filen) TrashDirectory(uuid string) error {
-	return api.client.PostV3DirTrash(context.Background(), uuid)
+func (api *Filen) TrashDirectory(ctx context.Context, uuid string) error {
+	return api.client.PostV3DirTrash(ctx, uuid)
 }
