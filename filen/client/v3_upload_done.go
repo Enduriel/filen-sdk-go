@@ -1,6 +1,9 @@
 package client
 
-import "github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+import (
+	"context"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+)
 
 type V3UploadDoneRequest struct {
 	UUID       string                 `json:"uuid"`
@@ -21,9 +24,9 @@ type V3UploadDoneResponse struct {
 }
 
 // PostV3UploadDone calls /v3/upload/done.
-func (c *Client) PostV3UploadDone(request V3UploadDoneRequest) (*V3UploadDoneResponse, error) {
+func (c *Client) PostV3UploadDone(ctx context.Context, request V3UploadDoneRequest) (*V3UploadDoneResponse, error) {
 	response := &V3UploadDoneResponse{}
-	_, err := c.RequestData("POST", GatewayURL("/v3/upload/done"), request, response)
+	_, err := c.RequestData(ctx, "POST", GatewayURL("/v3/upload/done"), request, response)
 	if err != nil {
 		return nil, err
 	}

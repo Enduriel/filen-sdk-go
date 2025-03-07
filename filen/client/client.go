@@ -5,6 +5,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,16 +71,16 @@ func cannotSendError(method string, url *FilenURL, err error) error {
 	}
 }
 
-func (uc *UnauthorizedClient) buildReaderRequest(method string, url *FilenURL, data io.Reader) (*http.Request, error) {
-	req, err := http.NewRequest(method, url.String(), data)
+func (uc *UnauthorizedClient) buildReaderRequest(ctx context.Context, method string, url *FilenURL, data io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url.String(), data)
 	if err != nil {
 		return nil, &RequestError{"Cannot build requestData", method, url, err}
 	}
 	return req, nil
 }
 
-func (c *Client) buildReaderRequest(method string, url *FilenURL, data io.Reader) (*http.Request, error) {
-	var request, err = c.UnauthorizedClient.buildReaderRequest(method, url, data)
+func (c *Client) buildReaderRequest(ctx context.Context, method string, url *FilenURL, data io.Reader) (*http.Request, error) {
+	var request, err = c.UnauthorizedClient.buildReaderRequest(ctx, method, url, data)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func (c *Client) buildReaderRequest(method string, url *FilenURL, data io.Reader
 	return request, nil
 }
 
-func (uc *UnauthorizedClient) buildJSONRequest(method string, url *FilenURL, requestData any) (*http.Request, error) {
+func (uc *UnauthorizedClient) buildJSONRequest(ctx context.Context, method string, url *FilenURL, requestData any) (*http.Request, error) {
 	var marshalled []byte
 	if requestData != nil {
 		var err error
@@ -96,7 +97,7 @@ func (uc *UnauthorizedClient) buildJSONRequest(method string, url *FilenURL, req
 			return nil, &RequestError{fmt.Sprintf("Cannot unmarshal requestData body %#v", requestData), method, url, err}
 		}
 	}
-	req, err := uc.buildReaderRequest(method, url, bytes.NewReader(marshalled))
+	req, err := uc.buildReaderRequest(ctx, method, url, bytes.NewReader(marshalled))
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +105,8 @@ func (uc *UnauthorizedClient) buildJSONRequest(method string, url *FilenURL, req
 	return req, nil
 }
 
-func (c *Client) buildJSONRequest(method string, url *FilenURL, requestData any) (*http.Request, error) {
-	var request, err = c.UnauthorizedClient.buildJSONRequest(method, url, requestData)
+func (c *Client) buildJSONRequest(ctx context.Context, method string, url *FilenURL, requestData any) (*http.Request, error) {
+	var request, err = c.UnauthorizedClient.buildJSONRequest(ctx, method, url, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -171,16 +172,16 @@ func convertIntoResponseData(method string, url *FilenURL, response *aPIResponse
 	return nil
 }
 
-func (uc *UnauthorizedClient) Request(method string, url *FilenURL, requestData any) (*aPIResponse, error) {
-	request, err := uc.buildJSONRequest(method, url, requestData)
+func (uc *UnauthorizedClient) Request(ctx context.Context, method string, url *FilenURL, requestData any) (*aPIResponse, error) {
+	request, err := uc.buildJSONRequest(ctx, method, url, requestData)
 	if err != nil {
 		return nil, err
 	}
 	return handleRequest(request, &uc.httpClient, method, url)
 }
 
-func (uc *UnauthorizedClient) RequestData(method string, url *FilenURL, requestData any, outData any) (*aPIResponse, error) {
-	response, err := uc.Request(method, url, requestData)
+func (uc *UnauthorizedClient) RequestData(ctx context.Context, method string, url *FilenURL, requestData any, outData any) (*aPIResponse, error) {
+	response, err := uc.Request(ctx, method, url, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -191,16 +192,16 @@ func (uc *UnauthorizedClient) RequestData(method string, url *FilenURL, requestD
 	return response, nil
 }
 
-func (c *Client) Request(method string, url *FilenURL, requestData any) (*aPIResponse, error) {
-	request, err := c.buildJSONRequest(method, url, requestData)
+func (c *Client) Request(ctx context.Context, method string, url *FilenURL, requestData any) (*aPIResponse, error) {
+	request, err := c.buildJSONRequest(ctx, method, url, requestData)
 	if err != nil {
 		return nil, err
 	}
 	return handleRequest(request, &c.httpClient, method, url)
 }
 
-func (c *Client) RequestData(method string, url *FilenURL, requestData any, outData any) (*aPIResponse, error) {
-	response, err := c.Request(method, url, requestData)
+func (c *Client) RequestData(ctx context.Context, method string, url *FilenURL, requestData any, outData any) (*aPIResponse, error) {
+	response, err := c.Request(ctx, method, url, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +258,7 @@ func (c *Client) DownloadFileChunk(uuid string, region string, bucket string, ch
 	}
 
 	// Can't use the standard Client.RequestData because the response body is raw bytes
-	request, err := c.buildJSONRequest("GET", url, nil)
+	request, err := c.buildJSONRequest(context.Background(), "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}

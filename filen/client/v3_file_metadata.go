@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 )
@@ -12,8 +13,8 @@ type v3FileMetadataRequest struct {
 	Metadata   crypto.EncryptedString `json:"metadata"`
 }
 
-func (c *Client) PostV3FileMetadata(uuid string, name crypto.EncryptedString, nameHashed string, metadata crypto.EncryptedString) error {
-	_, err := c.Request("POST", GatewayURL("/v3/file/metadata"), v3FileMetadataRequest{
+func (c *Client) PostV3FileMetadata(ctx context.Context, uuid string, name crypto.EncryptedString, nameHashed string, metadata crypto.EncryptedString) error {
+	_, err := c.Request(ctx, "POST", GatewayURL("/v3/file/metadata"), v3FileMetadataRequest{
 		UUID:       uuid,
 		Name:       name,
 		NameHashed: nameHashed,

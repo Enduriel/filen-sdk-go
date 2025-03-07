@@ -1,6 +1,9 @@
 package client
 
-import "github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+import (
+	"context"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+)
 
 type v3loginRequest struct {
 	Email         string `json:"email"`
@@ -18,9 +21,9 @@ type V3LoginResponse struct {
 }
 
 // PostV3Login calls /v3/login.
-func (uc *UnauthorizedClient) PostV3Login(email string, password crypto.DerivedPassword) (*V3LoginResponse, error) {
+func (uc *UnauthorizedClient) PostV3Login(ctx context.Context, email string, password crypto.DerivedPassword) (*V3LoginResponse, error) {
 	response := &V3LoginResponse{}
-	_, err := uc.RequestData("POST", GatewayURL("/v3/login"), v3loginRequest{
+	_, err := uc.RequestData(ctx, "POST", GatewayURL("/v3/login"), v3loginRequest{
 		Email:         email,
 		Password:      string(password),
 		TwoFactorCode: "XXXXXX",

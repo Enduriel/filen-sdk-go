@@ -1,6 +1,7 @@
 package filen
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -56,7 +57,7 @@ func (api *Filen) UpdateMeta(file *File) error {
 	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
 	nameHashed := api.HashFileName(file.Name)
 
-	err = api.client.PostV3FileMetadata(file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
+	err = api.client.PostV3FileMetadata(context.Background(), file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
 	if err != nil {
 		return fmt.Errorf("post v3 file metadata: %w", err)
 	}

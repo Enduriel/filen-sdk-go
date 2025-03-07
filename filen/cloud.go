@@ -1,6 +1,7 @@
 package filen
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -140,7 +141,7 @@ SegmentsLoop:
 // ReadDirectory fetches the files and directories that are children of a directory (specified by UUID).
 func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 	// fetch directory content
-	directoryContent, err := api.client.PostV3DirContent(uuid)
+	directoryContent, err := api.client.PostV3DirContent(context.Background(), uuid)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ReadDirectory fetching directory: %w", err)
 	}
@@ -212,7 +213,7 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 
 // TrashFile moves a file to trash.
 func (api *Filen) TrashFile(uuid string) error {
-	return api.client.PostV3FileTrash(uuid)
+	return api.client.PostV3FileTrash(context.Background(), uuid)
 }
 
 // CreateDirectory creates a new directory.
@@ -233,7 +234,7 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 	nameHashed := api.HashFileName(name)
 
 	// send
-	response, err := api.client.PostV3DirCreate(directoryUUID, metadataEncrypted, nameHashed, parentUUID)
+	response, err := api.client.PostV3DirCreate(context.Background(), directoryUUID, metadataEncrypted, nameHashed, parentUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -249,5 +250,5 @@ func (api *Filen) CreateDirectory(parentUUID string, name string) (*Directory, e
 
 // TrashDirectory moves a directory to trash.
 func (api *Filen) TrashDirectory(uuid string) error {
-	return api.client.PostV3DirTrash(uuid)
+	return api.client.PostV3DirTrash(context.Background(), uuid)
 }

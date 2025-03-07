@@ -1,6 +1,9 @@
 package client
 
-import "github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+import (
+	"context"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+)
 
 type v3dirContentRequest struct {
 	UUID string `json:"uuid"`
@@ -33,9 +36,9 @@ type V3DirContentResponse struct {
 }
 
 // PostV3DirContent calls /v3/dir/content.
-func (c *Client) PostV3DirContent(uuid string) (*V3DirContentResponse, error) {
+func (c *Client) PostV3DirContent(ctx context.Context, uuid string) (*V3DirContentResponse, error) {
 	directoryContent := &V3DirContentResponse{}
-	_, err := c.RequestData("POST", GatewayURL("/v3/dir/content"), v3dirContentRequest{
+	_, err := c.RequestData(ctx, "POST", GatewayURL("/v3/dir/content"), v3dirContentRequest{
 		UUID: uuid,
 	}, directoryContent)
 	return directoryContent, err
