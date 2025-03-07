@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/io"
+	"mime"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,20 +17,76 @@ import (
 	"github.com/google/uuid"
 )
 
-// File represents a file on the cloud drive.
-type File struct {
-	UUID          string               // the UUID of the cloud item
-	Name          string               // the file name
-	Size          int                  // the file size in bytes
-	MimeType      string               // the MIME type of the file
+type IncompleteFile struct {
+	UUID          string // the UUID of the cloud item
+	Name          string
+	MimeType      string
 	EncryptionKey crypto.EncryptionKey // the key used to encrypt the file data
 	Created       time.Time            // when the file was created
 	LastModified  time.Time            // when the file was last modified
 	ParentUUID    string               // the [Directory.UUID] of the file's parent directory
-	Favorited     bool                 // whether the file is marked a favorite
-	Region        string               // the file's storage region
-	Bucket        string               // the file's storage bucket
-	Chunks        int                  // how many 1 MiB chunks the file is partitioned into
+}
+
+func (api *Filen) MakeNewFileKey() (*crypto.EncryptionKey, error) {
+	switch api.AuthVersion {
+	case 1, 2:
+		encryptionKeyStr := crypto.GenerateRandomString(32)
+		encryptionKey, err := crypto.MakeEncryptionKeyFromBytes([32]byte([]byte(encryptionKeyStr)))
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 2: %w", err)
+		}
+		return encryptionKey, nil
+	default:
+		encryptionKey, err := crypto.NewEncryptionKey()
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 3: %w", err)
+		}
+		return encryptionKey, nil
+	}
+}
+
+func (api *Filen) NewIncompleteFile(name string, mimeType string, created time.Time, lastModified time.Time, parentUUID string) (*IncompleteFile, error) {
+	key, err := api.MakeNewFileKey()
+	if err != nil {
+		return nil, fmt.Errorf("make new file key: %w", err)
+	}
+	if mimeType == "" {
+		mimeType = mime.TypeByExtension(filepath.Ext(name))
+	}
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	} else {
+		mimeType, _, _ = strings.Cut(mimeType, ";")
+	}
+
+	return &IncompleteFile{
+		UUID:          uuid.NewString(),
+		Name:          name,
+		MimeType:      mimeType,
+		EncryptionKey: *key,
+		Created:       created.Round(time.Millisecond),
+		LastModified:  lastModified.Round(time.Millisecond),
+		ParentUUID:    parentUUID,
+	}, nil
+}
+
+func (api *Filen) NewIncompleteFileFromOSFile(osFile *os.File, parentUUID string) (*IncompleteFile, error) {
+	fileStat, err := osFile.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat file: %w", err)
+	}
+	created := io.GetCreationTime(fileStat)
+	return api.NewIncompleteFile(filepath.Base(osFile.Name()), "", created, fileStat.ModTime(), parentUUID)
+}
+
+// File represents a file on the cloud drive.
+type File struct {
+	IncompleteFile
+	Size      int    // the file size in bytes
+	Favorited bool   // whether the file is marked a favorite
+	Region    string // the file's storage region
+	Bucket    string // the file's storage bucket
+	Chunks    int    // how many 1 MiB chunks the file is partitioned into
 }
 
 // Directory represents a directory on the cloud drive.
@@ -168,18 +228,20 @@ func (api *Filen) ReadDirectory(uuid string) ([]*File, []*Directory, error) {
 		}
 
 		files = append(files, &File{
-			UUID:          file.UUID,
-			Name:          metadata.Name,
-			Size:          metadata.Size,
-			MimeType:      metadata.MimeType,
-			EncryptionKey: *encryptionKey,
-			Created:       util.TimestampToTime(int64(metadata.Created)),
-			LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
-			ParentUUID:    file.Parent,
-			Favorited:     file.Favorited == 1,
-			Region:        file.Region,
-			Bucket:        file.Bucket,
-			Chunks:        file.Chunks,
+			IncompleteFile: IncompleteFile{
+				UUID:          file.UUID,
+				Name:          metadata.Name,
+				MimeType:      metadata.MimeType,
+				EncryptionKey: *encryptionKey,
+				Created:       util.TimestampToTime(int64(metadata.Created)),
+				LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
+				ParentUUID:    file.Parent,
+			},
+			Size:      metadata.Size,
+			Favorited: file.Favorited == 1,
+			Region:    file.Region,
+			Bucket:    file.Bucket,
+			Chunks:    file.Chunks,
 		})
 	}
 

@@ -2,9 +2,9 @@ package filen_sdk_go
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
-	filenio "github.com/FilenCloudDienste/filen-sdk-go/filen/io"
 	"github.com/joho/godotenv"
 	"io"
 	"os"
@@ -90,14 +90,14 @@ func TestEmptyFileActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	uploadFileInfo, err := filenio.MakeInfoFromFile(osFile)
+	incompleteFile, err := filen.NewIncompleteFileFromOSFile(osFile, filen.BaseFolderUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var file *sdk.File
 
 	if !t.Run("Upload", func(t *testing.T) {
-		file, err = filen.UploadFile(uploadFileInfo, filen.BaseFolderUUID)
+		file, err = filen.UploadFile(context.Background(), incompleteFile, osFile)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,6 +109,9 @@ func TestEmptyFileActions(t *testing.T) {
 		foundFile, _, err := filen.FindItem("/empty.txt", false)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if foundFile == nil {
+			t.Fatal("File not found")
 		}
 		if foundFile.Size != 0 {
 			t.Fatalf("File size is not zero: %v", foundFile.Size)
@@ -145,7 +148,7 @@ func TestFileActions(t *testing.T) {
 	osFile, err := os.Open("test_files/" + fileName)
 
 	uploadsDirUUID := filen.BaseFolderUUID
-	uploadFileInfo, err := filenio.MakeInfoFromFile(osFile)
+	incompleteFile, err := filen.NewIncompleteFileFromOSFile(osFile, uploadsDirUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +158,7 @@ func TestFileActions(t *testing.T) {
 	)
 
 	if !t.Run("Upload", func(t *testing.T) {
-		file, err = filen.UploadFile(uploadFileInfo, uploadsDirUUID)
+		file, err = filen.UploadFile(context.Background(), incompleteFile, osFile)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +170,7 @@ func TestFileActions(t *testing.T) {
 		file.Created = file.Created.Add(time.Second)
 		file.LastModified = file.LastModified.Add(time.Second)
 
-		err = filen.UpdateMeta(file)
+		err = filen.UpdateMeta(context.Background(), file)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -2,20 +2,13 @@ package client
 
 import (
 	"context"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 )
 
 type V3UploadDoneRequest struct {
-	UUID       string                 `json:"uuid"`
-	Name       crypto.EncryptedString `json:"name"`
-	NameHashed string                 `json:"nameHashed"`
-	Size       string                 `json:"size"`
-	Chunks     int                    `json:"chunks"`
-	MimeType   crypto.EncryptedString `json:"mime"`
-	Rm         string                 `json:"rm"`
-	Metadata   crypto.EncryptedString `json:"metadata"`
-	Version    int                    `json:"version"`
-	UploadKey  string                 `json:"uploadKey"`
+	V3UploadEmptyRequest
+	Chunks    int    `json:"chunks"`
+	Rm        string `json:"rm"`
+	UploadKey string `json:"uploadKey"`
 }
 
 type V3UploadDoneResponse struct {

@@ -7,19 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
-	"time"
 )
 
-type v3uploadResponse struct {
+type V3UploadResponse struct {
 	Bucket string `json:"bucket"`
 	Region string `json:"region"`
 }
 
 // PostV3Upload uploads a file chunk to the storage backend.
-func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (string, string, error) {
-	startTime := time.Now()
+func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (*V3UploadResponse, error) {
 	// build request
-	fmt.Printf("started uploading chunk %d\n", chunkIdx)
 	dataHash := hex.EncodeToString(crypto.RunSHA521(data))
 	url := &FilenURL{
 		Type: URLTypeIngest,
@@ -30,23 +27,22 @@ func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, pa
 	// Can't use the standard Client.RequestData because our request body is raw bytes
 	req, err := c.buildReaderRequest(ctx, method, url, bytes.NewBuffer(data))
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	response, err := handleRequest(req, &c.httpClient, method, url)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	if response.Status == false {
-		return "", "", errors.New("Cannot upload file chunk: " + response.Message)
+		return nil, errors.New("Cannot upload file chunk: " + response.Message)
 	}
 
-	uploadResponse := &v3uploadResponse{}
+	uploadResponse := &V3UploadResponse{}
 	err = response.IntoData(uploadResponse)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	fmt.Printf("time to upload chunk %d: %s\n", chunkIdx, time.Since(startTime))
-	return uploadResponse.Region, uploadResponse.Bucket, nil
+	return uploadResponse, nil
 }

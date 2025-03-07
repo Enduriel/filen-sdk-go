@@ -16,13 +16,8 @@ type V3UploadEmptyRequest struct {
 	Version    int                    `json:"version"`
 }
 
-type V3UploadEmptyResponse struct {
-	Chunks int `json:"chunks"`
-	Size   int `json:"size"`
-}
-
-func (c *Client) PostV3UploadEmpty(ctx context.Context, request V3UploadEmptyRequest) (*V3UploadEmptyResponse, error) {
-	response := &V3UploadEmptyResponse{}
+func (c *Client) PostV3UploadEmpty(ctx context.Context, request V3UploadEmptyRequest) (*V3UploadDoneResponse, error) {
+	response := &V3UploadDoneResponse{}
 	_, err := c.RequestData(ctx, "POST", GatewayURL("/v3/upload/empty"), request, response)
 	if err != nil {
 		return nil, err

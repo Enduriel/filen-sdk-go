@@ -50,7 +50,11 @@ func (api *Filen) GetDownloadReader(ctx context.Context, file *File) io.ReadClos
 	return newChunkedReader(ctx, api, file)
 }
 
-func (api *Filen) UpdateMeta(file *File) error {
+func (api *Filen) UploadFromReader(ctx context.Context, file *IncompleteFile, r io.Reader) (*File, error) {
+	return api.UploadFile(ctx, file, r)
+}
+
+func (api *Filen) UpdateMeta(ctx context.Context, file *File) error {
 	metaData := FileMetadata{
 		Name:         file.Name,
 		Size:         file.Size,
@@ -67,7 +71,7 @@ func (api *Filen) UpdateMeta(file *File) error {
 	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
 	nameHashed := api.HashFileName(file.Name)
 
-	err = api.client.PostV3FileMetadata(context.Background(), file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
+	err = api.client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
 	if err != nil {
 		return fmt.Errorf("post v3 file metadata: %w", err)
 	}
