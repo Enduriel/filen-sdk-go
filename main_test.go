@@ -141,7 +141,8 @@ func TestEmptyFileActions(t *testing.T) {
 }
 
 func TestFileActions(t *testing.T) {
-	osFile, err := os.Open("test_files/large_sample-3mb.txt")
+	fileName := "large_sample-20mb.txt"
+	osFile, err := os.Open("test_files/" + fileName)
 
 	uploadsDirUUID := filen.BaseFolderUUID
 	uploadFileInfo, err := filenio.MakeInfoFromFile(osFile)
@@ -173,7 +174,7 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Find", func(t *testing.T) {
-		foundFile, _, err := filen.FindItem("/large_sample-3mb.txt", false)
+		foundFile, _, err := filen.FindItem("/"+fileName, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,11 +184,12 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Download", func(t *testing.T) {
-		err := filen.DownloadToPath(file, "downloaded/large_sample-3mb.txt")
+		downloadPath := "downloaded/" + fileName
+		err := filen.DownloadToPath(file, downloadPath)
 		if err != nil {
 			t.Fatal(err)
 		}
-		downloadedFile, err := os.Open("downloaded/large_sample-3mb.txt")
+		downloadedFile, err := os.Open(downloadPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -226,11 +228,18 @@ func writeTestFiles() error {
 	if err = writeTestData(smallFile, 100_000); err != nil {
 		return err
 	}
-	bigFile, err := os.Create("test_files/large_sample-3mb.txt")
+	normalFile, err := os.Create("test_files/large_sample-3mb.txt")
 	if err != nil {
 		return fmt.Errorf("failed to create large_sample-3mb: %w", err)
 	}
-	if err = writeTestData(bigFile, 350_000); err != nil {
+	if err = writeTestData(normalFile, 350_000); err != nil {
+		return err
+	}
+	bigFile, err := os.Create("test_files/large_sample-20mb.txt")
+	if err != nil {
+		return fmt.Errorf("failed to create large_sample-20mb: %w", err)
+	}
+	if err = writeTestData(bigFile, 2_700_000); err != nil {
 		return err
 	}
 	return nil
