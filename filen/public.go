@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 )
@@ -20,10 +21,15 @@ func (api *Filen) DownloadToPath(file *File, downloadPath string) error {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	fName := f.Name()
-	err = api.downloadFile(file, f)
+	ctx := context.Background()
+	_, err = f.ReadFrom(api.GetDownloadReader(ctx, file))
 	errClose := f.Close()
 	if err != nil {
 		_ = os.Remove(fName)
+		maybeErr := context.Cause(ctx)
+		if maybeErr != nil {
+			return fmt.Errorf("download file: %w", maybeErr)
+		}
 		return fmt.Errorf("download file: %w", err)
 	}
 
@@ -38,6 +44,10 @@ func (api *Filen) DownloadToPath(file *File, downloadPath string) error {
 		return fmt.Errorf("rename file: %w", err)
 	}
 	return nil
+}
+
+func (api *Filen) GetDownloadReader(ctx context.Context, file *File) io.ReadCloser {
+	return newChunkedReader(ctx, api, file)
 }
 
 func (api *Filen) UpdateMeta(file *File) error {

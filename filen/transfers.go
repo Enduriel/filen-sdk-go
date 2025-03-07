@@ -24,130 +24,8 @@ const (
 	maxCryptoedBuffer    = 16
 	maxReadBuffer        = 16
 	maxConcurrentWriters = 16
-	chunkSize            = 1048576
+	ChunkSize            = 1048576
 )
-
-type fileDownload struct {
-	file  *File
-	ctx   context.Context
-	filen *Filen
-}
-
-func newFileDownload(filen *Filen, file *File, ctx context.Context) *fileDownload {
-	return &fileDownload{
-		file:  file,
-		ctx:   ctx,
-		filen: filen,
-	}
-}
-
-func (fd *fileDownload) downloadChunks(outChunks chan<- Chunk) error {
-	defer close(outChunks)
-	g, ctx := errgroup.WithContext(fd.ctx)
-	sem := make(chan struct{}, maxNetworkWorkers)
-
-	for i := 0; i < fd.file.Chunks; i++ {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case sem <- struct{}{}:
-			g.Go(func() error {
-				defer func() { <-sem }()
-				fmt.Printf("Downloading chunk %d\n", i)
-				encryptedBytes, err := fd.filen.client.DownloadFileChunk(fd.file.UUID, fd.file.Region, fd.file.Bucket, i)
-				if err != nil {
-					return fmt.Errorf("download i %d: %w", i, err)
-				}
-				outChunks <- Chunk{
-					Data:  encryptedBytes,
-					Index: i,
-				}
-				return nil
-			})
-		}
-	}
-	return g.Wait()
-}
-
-func (fd *fileDownload) decryptChunks(in <-chan Chunk, out chan<- Chunk) error {
-	defer close(out)
-	g, ctx := errgroup.WithContext(fd.ctx)
-	sem := make(chan struct{}, maxCryptoWorkers)
-
-	for chunk := range in {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case sem <- struct{}{}:
-			g.Go(func() error {
-				defer func() { <-sem }()
-				fmt.Printf("Decrypting chunk %d\n", chunk.Index)
-
-				decryptedBytes, err := fd.file.EncryptionKey.DecryptData(chunk.Data)
-				if err != nil {
-					return fmt.Errorf("decrypt chunk %d: %w", chunk.Index, err)
-				}
-				chunk.Data = decryptedBytes
-				out <- chunk
-				return nil
-			})
-		}
-	}
-
-	return g.Wait()
-}
-
-func (fd *fileDownload) writeChunks(in <-chan Chunk, ws io.WriteSeeker) error {
-	for {
-		select {
-		case <-fd.ctx.Done():
-			return fd.ctx.Err()
-		case chunk, ok := <-in:
-			if !ok {
-				return nil
-			}
-			fmt.Printf("Writing chunk %d\n", chunk.Index)
-			_, err := ws.Seek(int64(chunk.Index*chunkSize), io.SeekStart)
-			if err != nil {
-				return err
-			}
-			_, err = ws.Write(chunk.Data)
-			if err != nil {
-				return err
-			}
-		}
-	}
-}
-
-func (api *Filen) downloadFile(file *File, ws io.WriteSeeker) error {
-	g, ctx := errgroup.WithContext(context.Background())
-	fd := newFileDownload(api, file, ctx)
-	downloadedChunks := make(chan Chunk, maxDownloadedBuffer)
-	decryptedChunks := make(chan Chunk, maxCryptoedBuffer)
-
-	g.Go(func() error {
-		if err := fd.downloadChunks(downloadedChunks); err != nil {
-			return fmt.Errorf("download chunks: %w", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		if err := fd.decryptChunks(downloadedChunks, decryptedChunks); err != nil {
-			return fmt.Errorf("decrypt chunks: %w", err)
-		}
-		return nil
-	})
-	g.Go(func() error {
-		if err := fd.writeChunks(decryptedChunks, ws); err != nil {
-			return fmt.Errorf("write chunks: %w", err)
-		}
-		return nil
-	})
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	return nil
-}
 
 type FileUpload struct {
 	UUID string
@@ -202,7 +80,7 @@ func NewFileUpload(filen *Filen, fileInfo filenio.FileInfo, parentUUID string, c
 func (fu *FileUpload) readChunks(inReader io.Reader, outChunks chan<- Chunk) (int, error) {
 	defer close(outChunks)
 	chunkID := 0
-	buffer := make([]byte, chunkSize)
+	buffer := make([]byte, ChunkSize)
 	size := 0
 
 	for {
@@ -329,7 +207,7 @@ func (fu *FileUpload) completeUpload(bucket string, region string, size int) (*F
 	nameEncrypted := fu.encryptionKey.EncryptMeta(fu.fileInfo.Name)
 	nameHashed := fu.filen.HashFileName(fu.fileInfo.Name)
 
-	numChunks := (size / chunkSize) + 1
+	numChunks := (size / ChunkSize) + 1
 	response, err := fu.filen.client.PostV3UploadDone(context.Background(), client.V3UploadDoneRequest{
 		UUID:       fu.UUID,
 		Name:       nameEncrypted,

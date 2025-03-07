@@ -251,14 +251,14 @@ func (res *aPIResponse) IntoData(data any) error {
 // file chunks
 
 // DownloadFileChunk downloads a file chunk from the storage backend.
-func (c *Client) DownloadFileChunk(uuid string, region string, bucket string, chunkIdx int) ([]byte, error) {
+func (c *Client) DownloadFileChunk(ctx context.Context, uuid string, region string, bucket string, chunkIdx int) ([]byte, error) {
 	url := &FilenURL{
 		Type: URLTypeEgest,
 		Path: fmt.Sprintf("/%s/%s/%s/%v", region, bucket, uuid, chunkIdx),
 	}
 
 	// Can't use the standard Client.RequestData because the response body is raw bytes
-	request, err := c.buildJSONRequest(context.Background(), "GET", url, nil)
+	request, err := c.buildJSONRequest(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
