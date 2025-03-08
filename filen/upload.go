@@ -29,7 +29,7 @@ type FileMetadata struct {
 	MimeType     string `json:"mime"`
 	Key          string `json:"key"`
 	LastModified int    `json:"lastModified"`
-	Created      int    `json:"created"`
+	Created      int    `json:"creation"`
 	Hash         string `json:"hash"`
 }
 
