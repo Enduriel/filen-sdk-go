@@ -143,24 +143,27 @@ func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*types.File
 	// transform directories
 	directories := make([]*types.Directory, 0)
 	for _, directory := range directoryContent.Folders {
-		nameStr, err := api.DecryptMeta(directory.Name)
+		metaStr, err := api.DecryptMeta(directory.Metadata)
 		if err != nil {
-			return nil, nil, fmt.Errorf("ReadDirectory decrypting name: %v", err)
+			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
-		var name struct {
-			Name string `json:"name"`
-		}
-		err = json.Unmarshal([]byte(nameStr), &name)
+		metaData := types.DirectoryMetaData{}
+		err = json.Unmarshal([]byte(metaStr), &metaData)
 		if err != nil {
-			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling name: %v", err)
+			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling metadata: %v", err)
+		}
+
+		creationTimestamp := metaData.Creation
+		if creationTimestamp == 0 {
+			creationTimestamp = directory.Timestamp
 		}
 
 		directories = append(directories, &types.Directory{
 			UUID:       directory.UUID,
-			Name:       name.Name,
+			Name:       metaData.Name,
 			ParentUUID: directory.Parent,
 			Color:      directory.Color,
-			Created:    util.TimestampToTime(int64(directory.Timestamp)),
+			Created:    util.TimestampToTime(int64(creationTimestamp)),
 			Favorited:  directory.Favorited == 1,
 		})
 	}
@@ -176,11 +179,12 @@ func (api *Filen) TrashFile(ctx context.Context, uuid string) error {
 // CreateDirectory creates a new directory.
 func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name string) (*types.Directory, error) {
 	directoryUUID := uuid.New().String()
-
+	creationTime := time.Now().Round(time.Millisecond)
 	// encrypt metadata
-	metadata := struct {
-		Name string `json:"name"`
-	}{name}
+	metadata := types.DirectoryMetaData{
+		Name:     name,
+		Creation: int(creationTime.UnixMilli()),
+	}
 	metadataStr, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err
@@ -200,7 +204,7 @@ func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name s
 		Name:       name,
 		ParentUUID: parentUUID,
 		Color:      types.DirColorDefault,
-		Created:    time.Time{}, // set server side. This is potentially problematic for the design of the api
+		Created:    creationTime,
 		Favorited:  false,
 	}, nil
 }

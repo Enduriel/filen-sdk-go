@@ -78,6 +78,11 @@ const (
 	DirColorGray    DirColor = "gray"
 )
 
+type DirectoryMetaData struct {
+	Name     string `json:"name"`
+	Creation int    `json:"creation"`
+}
+
 // Directory represents a directory on the cloud drive.
 type Directory struct {
 	UUID       string    // the UUID of the cloud item

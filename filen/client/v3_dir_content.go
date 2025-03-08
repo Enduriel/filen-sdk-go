@@ -26,7 +26,7 @@ type V3DirContentResponse struct {
 	} `json:"uploads"`
 	Folders []struct {
 		UUID      string                 `json:"uuid"`
-		Name      crypto.EncryptedString `json:"name"`
+		Metadata  crypto.EncryptedString `json:"name"` // name is actually the metadata
 		Parent    string                 `json:"parent"`
 		Color     types.DirColor         `json:"color"`
 		Timestamp int                    `json:"timestamp"`

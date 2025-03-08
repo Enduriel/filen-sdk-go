@@ -107,7 +107,6 @@ func TestDirectoryActions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if dir, ok := dirOrRoot.(*types.Directory); ok {
-			dir.Created = time.Time{} // timestamps are set by server
 			if !reflect.DeepEqual(dir, directory) {
 				t.Fatalf("directories are not equal:\nCreated:%#v\nFound:%#v\n", directory, dir)
 			}
