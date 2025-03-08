@@ -229,6 +229,24 @@ type EncryptionKey struct {
 	Cipher cipher.AEAD
 }
 
+func MakeNewFileKey(authVersion int) (*EncryptionKey, error) {
+	switch authVersion {
+	case 1, 2:
+		encryptionKeyStr := GenerateRandomString(32)
+		encryptionKey, err := MakeEncryptionKeyFromBytes([32]byte([]byte(encryptionKeyStr)))
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 2: %w", err)
+		}
+		return encryptionKey, nil
+	default:
+		encryptionKey, err := NewEncryptionKey()
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 3: %w", err)
+		}
+		return encryptionKey, nil
+	}
+}
+
 func (key *EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 	nonce := [12]byte(GenerateRandomBytes(12))
 	encrypted := key.Cipher.Seal(nil, nonce[:], []byte(metadata), nil)

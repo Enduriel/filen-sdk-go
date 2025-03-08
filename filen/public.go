@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"io"
 	"os"
 	"path"
@@ -13,7 +14,7 @@ import (
 // The file is first downloaded to a temporary file in the same directory,
 // then renamed to the final path. If an error occurs during download or rename,
 // the temporary file is removed.
-func (api *Filen) DownloadToPath(ctx context.Context, file *File, downloadPath string) error {
+func (api *Filen) DownloadToPath(ctx context.Context, file *types.File, downloadPath string) error {
 	downloadDir := path.Dir(downloadPath)
 	// needs to be removed or renamed
 	f, err := os.CreateTemp(downloadDir, fmt.Sprintf("%s-download-*.tmp", file.Name))
@@ -45,15 +46,15 @@ func (api *Filen) DownloadToPath(ctx context.Context, file *File, downloadPath s
 	return nil
 }
 
-func (api *Filen) GetDownloadReader(ctx context.Context, file *File) io.ReadCloser {
+func (api *Filen) GetDownloadReader(ctx context.Context, file *types.File) io.ReadCloser {
 	return newChunkedReader(ctx, api, file)
 }
 
-func (api *Filen) UploadFromReader(ctx context.Context, file *IncompleteFile, r io.Reader) (*File, error) {
+func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
 	return api.UploadFile(ctx, file, r)
 }
 
-func (api *Filen) UpdateMeta(ctx context.Context, file *File) error {
+func (api *Filen) UpdateMeta(ctx context.Context, file *types.File) error {
 	metaData := FileMetadata{
 		Name:         file.Name,
 		Size:         file.Size,

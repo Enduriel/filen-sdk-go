@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/joho/godotenv"
 	"io"
 	"os"
@@ -85,16 +86,73 @@ func TestReadDirectories(t *testing.T) {
 	}
 }
 
+func TestDirectoryActions(t *testing.T) {
+	newPath := "/abc/def/ghi"
+	var directory *types.Directory
+	t.Run("Create FindDirectoryOrCreate", func(t *testing.T) {
+		dirOrRoot, err := filen.FindDirectoryOrCreate(context.Background(), newPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dir, ok := dirOrRoot.(*types.Directory); ok {
+			directory = dir
+		} else {
+			t.Fatal("dirOrRoot is not a normal directory")
+		}
+	})
+
+	t.Run("Find FindDirectoryOrCreate", func(t *testing.T) {
+		dirOrRoot, err := filen.FindDirectoryOrCreate(context.Background(), newPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dir, ok := dirOrRoot.(*types.Directory); ok {
+			dir.Created = time.Time{} // timestamps are set by server
+			if !reflect.DeepEqual(dir, directory) {
+				t.Fatalf("directories are not equal:\nCreated:%#v\nFound:%#v\n", directory, dir)
+			}
+		} else {
+			t.Fatal("dirOrRoot is not a normal directory")
+		}
+	})
+	t.Run("Trash", func(t *testing.T) {
+		err := filen.TrashDirectory(context.Background(), directory.UUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		dir, err := filen.FindItem(context.Background(), newPath, true)
+		if err != nil {
+			t.Fatal("failed to gracefully handle missing directory: ", err)
+		}
+		if dir != nil {
+			t.Fatal("Directory not trashed")
+		}
+	})
+	t.Run("Cleanup", func(t *testing.T) {
+		dir, err := filen.FindItem(context.Background(), "/abc", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dir, ok := dir.(*types.Directory); ok {
+			err := filen.TrashDirectory(context.Background(), dir.UUID)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+}
+
 func TestEmptyFileActions(t *testing.T) {
 	osFile, err := os.Open("test_files/empty.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	incompleteFile, err := filen.NewIncompleteFileFromOSFile(osFile, filen.BaseFolderUUID)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, filen.BaseFolderUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var file *sdk.File
+	var file *types.File
 
 	if !t.Run("Upload", func(t *testing.T) {
 		file, err = filen.UploadFile(context.Background(), incompleteFile, osFile)
@@ -106,11 +164,16 @@ func TestEmptyFileActions(t *testing.T) {
 	}
 
 	t.Run("Find", func(t *testing.T) {
-		foundFile, _, err := filen.FindItem(context.Background(), "/empty.txt", false)
+		foundObj, err := filen.FindItem(context.Background(), "/empty.txt", false)
+
 		if err != nil {
 			t.Fatal(err)
 		}
-		if foundFile == nil {
+		if foundObj == nil {
+			t.Fatal("File not found")
+		}
+		foundFile, ok := foundObj.(*types.File)
+		if !ok {
 			t.Fatal("File not found")
 		}
 		if foundFile.Size != 0 {
@@ -148,13 +211,13 @@ func TestFileActions(t *testing.T) {
 	osFile, err := os.Open("test_files/" + fileName)
 
 	uploadsDirUUID := filen.BaseFolderUUID
-	incompleteFile, err := filen.NewIncompleteFileFromOSFile(osFile, uploadsDirUUID)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, uploadsDirUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var (
-		file *sdk.File
+		file *types.File
 	)
 
 	if !t.Run("Upload", func(t *testing.T) {
@@ -177,9 +240,13 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Find", func(t *testing.T) {
-		foundFile, _, err := filen.FindItem(context.Background(), "/"+fileName, false)
+		foundObj, err := filen.FindItem(context.Background(), "/"+fileName, false)
 		if err != nil {
 			t.Fatal(err)
+		}
+		foundFile, ok := foundObj.(*types.File)
+		if !ok {
+			t.Fatal("File not found")
 		}
 		if !reflect.DeepEqual(file, foundFile) {
 			t.Fatalf("Uploaded \n%#v\n and Downloaded \n%#v\n file info did not match", file, foundFile)

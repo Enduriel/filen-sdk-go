@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
 type v3dirContentRequest struct {
@@ -27,7 +28,7 @@ type V3DirContentResponse struct {
 		UUID      string                 `json:"uuid"`
 		Name      crypto.EncryptedString `json:"name"`
 		Parent    string                 `json:"parent"`
-		Color     interface{}            `json:"color"`
+		Color     types.DirColor         `json:"color"`
 		Timestamp int                    `json:"timestamp"`
 		Favorited int                    `json:"favorited"`
 		IsSync    int                    `json:"is_sync"`

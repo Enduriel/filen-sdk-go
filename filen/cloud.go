@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/io"
-	"mime"
-	"os"
-	"path/filepath"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"strings"
 	"time"
 
@@ -17,117 +14,16 @@ import (
 	"github.com/google/uuid"
 )
 
-type IncompleteFile struct {
-	UUID          string // the UUID of the cloud item
-	Name          string
-	MimeType      string
-	EncryptionKey crypto.EncryptionKey // the key used to encrypt the file data
-	Created       time.Time            // when the file was created
-	LastModified  time.Time            // when the file was last modified
-	ParentUUID    string               // the [Directory.UUID] of the file's parent directory
-}
-
-func (api *Filen) MakeNewFileKey() (*crypto.EncryptionKey, error) {
-	switch api.AuthVersion {
-	case 1, 2:
-		encryptionKeyStr := crypto.GenerateRandomString(32)
-		encryptionKey, err := crypto.MakeEncryptionKeyFromBytes([32]byte([]byte(encryptionKeyStr)))
-		if err != nil {
-			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 2: %w", err)
-		}
-		return encryptionKey, nil
-	default:
-		encryptionKey, err := crypto.NewEncryptionKey()
-		if err != nil {
-			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 3: %w", err)
-		}
-		return encryptionKey, nil
-	}
-}
-
-func (api *Filen) NewIncompleteFile(name string, mimeType string, created time.Time, lastModified time.Time, parentUUID string) (*IncompleteFile, error) {
-	key, err := api.MakeNewFileKey()
-	if err != nil {
-		return nil, fmt.Errorf("make new file key: %w", err)
-	}
-	if mimeType == "" {
-		mimeType = mime.TypeByExtension(filepath.Ext(name))
-	}
-	if mimeType == "" {
-		mimeType = "application/octet-stream"
-	} else {
-		mimeType, _, _ = strings.Cut(mimeType, ";")
-	}
-
-	return &IncompleteFile{
-		UUID:          uuid.NewString(),
-		Name:          filepath.Base(name),
-		MimeType:      mimeType,
-		EncryptionKey: *key,
-		Created:       created.Round(time.Millisecond),
-		LastModified:  lastModified.Round(time.Millisecond),
-		ParentUUID:    parentUUID,
-	}, nil
-}
-
-func (api *Filen) NewIncompleteFileFromOSFile(osFile *os.File, parentUUID string) (*IncompleteFile, error) {
-	fileStat, err := osFile.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("stat file: %w", err)
-	}
-	created := io.GetCreationTime(fileStat)
-	return api.NewIncompleteFile(osFile.Name(), "", created, fileStat.ModTime(), parentUUID)
-}
-
-// File represents a file on the cloud drive.
-type File struct {
-	IncompleteFile
-	Size      int    // the file size in bytes
-	Favorited bool   // whether the file is marked a favorite
-	Region    string // the file's storage region
-	Bucket    string // the file's storage bucket
-	Chunks    int    // how many 1 MiB chunks the file is partitioned into
-	Hash      string // the file's SHA512 hash
-}
-
-// Directory represents a directory on the cloud drive.
-type Directory struct {
-	UUID       string    // the UUID of the cloud item
-	Name       string    // the directory name
-	ParentUUID string    // the [Directory.UUID] of the directory's parent directory (or zero value for the root directory)
-	Color      string    // the color assigned to the directory (zero value means default color)
-	Created    time.Time // when the directory was created
-	Favorited  bool      // whether the directory is marked a favorite
-}
-
-// FindItemUUID finds a cloud item by its path and returns its UUID.
-// Returns an empty string if none was found.
-// Use this instead of FindItem to correctly handle paths pointing to the base directory.
-func (api *Filen) FindItemUUID(ctx context.Context, path string, requireDirectory bool) (string, error) {
-	if len(strings.Join(strings.Split(path, "/"), "")) == 0 { // empty path
-		return api.BaseFolderUUID, nil
-	} else {
-		file, directory, err := api.FindItem(ctx, path, requireDirectory)
-		if err != nil {
-			return "", err
-		}
-		if file != nil {
-			return file.UUID, nil
-		}
-		if directory != nil {
-			return directory.UUID, nil
-		}
-		return "", nil
-	}
-}
-
 // FindItem find a cloud item by its path and returns it (either the File or the Directory will be returned).
 // Set requireDirectory to differentiate between files and directories with the same path (otherwise, the file will be found).
 // Returns nil for both File and Directory if none was found.
-func (api *Filen) FindItem(ctx context.Context, path string, requireDirectory bool) (*File, *Directory, error) {
+func (api *Filen) FindItem(ctx context.Context, path string, requireDirectory bool) (types.FileSystemObject, error) {
+
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
-		return nil, nil, fmt.Errorf("no segments in path %s", path)
+		return &types.RootDirectory{
+			UUID: api.BaseFolderUUID,
+		}, nil
 	}
 
 	currentUUID := api.BaseFolderUUID
@@ -139,68 +35,65 @@ SegmentsLoop:
 
 		files, directories, err := api.ReadDirectory(ctx, currentUUID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("read directory: %w", err)
+			return nil, fmt.Errorf("read directory: %w", err)
 		}
 		if !requireDirectory {
 			for _, file := range files {
 				if file.Name == segment {
-					return file, nil, nil
+					return file, nil
 				}
 			}
 		}
 		for _, directory := range directories {
 			if directory.Name == segment {
 				if segmentIdx == len(segments)-1 {
-					return nil, directory, nil
+					return directory, nil
 				} else {
 					currentUUID = directory.UUID
 					continue SegmentsLoop
 				}
 			}
 		}
-		return nil, nil, nil
+		return nil, nil
 	}
-	return nil, nil, errors.New("unreachable")
+	return nil, errors.New("unreachable")
 }
 
 // FindDirectoryOrCreate finds a cloud directory by its path and returns its UUID.
 // If the directory cannot be found, it (and all non-existent parent directories) will be created.
-func (api *Filen) FindDirectoryOrCreate(ctx context.Context, path string) (string, error) {
+func (api *Filen) FindDirectoryOrCreate(ctx context.Context, path string) (types.DirectoryInterface, error) {
 	segments := strings.Split(path, "/")
-	if len(strings.Join(segments, "")) == 0 {
-		return api.BaseFolderUUID, nil
-	}
 
-	currentUUID := api.BaseFolderUUID
+	var currentDir types.DirectoryInterface = &types.RootDirectory{UUID: api.BaseFolderUUID}
 SegmentsLoop:
 	for _, segment := range segments {
 		if segment == "" {
 			continue
 		}
 
-		_, directories, err := api.ReadDirectory(ctx, currentUUID)
+		_, directories, err := api.ReadDirectory(ctx, currentDir.GetUUID())
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		for _, directory := range directories {
 			if directory.Name == segment {
 				// directory found
-				currentUUID = directory.UUID
+				currentDir = directory
 				continue SegmentsLoop
 			}
 		}
 		// create directory
-		directory, err := api.CreateDirectory(ctx, currentUUID, segment)
+		directory, err := api.CreateDirectory(ctx, currentDir.GetUUID(), segment)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		currentUUID = directory.UUID
+		currentDir = directory
 	}
-	return currentUUID, nil
+	return currentDir, nil
 }
 
 // ReadDirectory fetches the files and directories that are children of a directory (specified by UUID).
-func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*Directory, error) {
+func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*types.File, []*types.Directory, error) {
 	// fetch directory content
 	directoryContent, err := api.client.PostV3DirContent(ctx, uuid)
 	if err != nil {
@@ -208,7 +101,7 @@ func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*D
 	}
 
 	// transform files
-	files := make([]*File, 0)
+	files := make([]*types.File, 0)
 	for _, file := range directoryContent.Uploads {
 		metadataStr, err := api.DecryptMeta(file.Metadata)
 		if err != nil {
@@ -228,8 +121,8 @@ func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*D
 			return nil, nil, fmt.Errorf("ReadDirectory creating encryption key: %v", err)
 		}
 
-		files = append(files, &File{
-			IncompleteFile: IncompleteFile{
+		files = append(files, &types.File{
+			IncompleteFile: types.IncompleteFile{
 				UUID:          file.UUID,
 				Name:          metadata.Name,
 				MimeType:      metadata.MimeType,
@@ -248,7 +141,7 @@ func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*D
 	}
 
 	// transform directories
-	directories := make([]*Directory, 0)
+	directories := make([]*types.Directory, 0)
 	for _, directory := range directoryContent.Folders {
 		nameStr, err := api.DecryptMeta(directory.Name)
 		if err != nil {
@@ -262,11 +155,11 @@ func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*D
 			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling name: %v", err)
 		}
 
-		directories = append(directories, &Directory{
+		directories = append(directories, &types.Directory{
 			UUID:       directory.UUID,
 			Name:       name.Name,
 			ParentUUID: directory.Parent,
-			Color:      "<none>", //TODO tmp
+			Color:      directory.Color,
 			Created:    util.TimestampToTime(int64(directory.Timestamp)),
 			Favorited:  directory.Favorited == 1,
 		})
@@ -281,7 +174,7 @@ func (api *Filen) TrashFile(ctx context.Context, uuid string) error {
 }
 
 // CreateDirectory creates a new directory.
-func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name string) (*Directory, error) {
+func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name string) (*types.Directory, error) {
 	directoryUUID := uuid.New().String()
 
 	// encrypt metadata
@@ -302,12 +195,12 @@ func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name s
 	if err != nil {
 		return nil, err
 	}
-	return &Directory{
+	return &types.Directory{
 		UUID:       response.UUID,
 		Name:       name,
 		ParentUUID: parentUUID,
-		Color:      "",
-		Created:    time.Now(),
+		Color:      types.DirColorDefault,
+		Created:    time.Time{}, // set server side. This is potentially problematic for the design of the api
 		Favorited:  false,
 	}, nil
 }

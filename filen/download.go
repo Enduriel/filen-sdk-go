@@ -3,11 +3,12 @@ package filen
 import (
 	"context"
 	"fmt"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"io"
 	"sync"
 )
 
-func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *File, chunkIndex int) ([]byte, error) {
+func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, chunkIndex int) ([]byte, error) {
 	// could potentially be optimized by accepting a []byte buffer to reuse
 	encryptedBytes, err := api.client.DownloadFileChunk(ctx, file.UUID, file.Region, file.Bucket, chunkIndex)
 	if err != nil {
@@ -91,7 +92,7 @@ func (c *chunkState) copyTo(ctx context.Context, out []byte, offset int, maxLeng
 
 // ChunkedReader implements io.Reader for sequential chunked file downloads
 type ChunkedReader struct {
-	file          *File
+	file          *types.File
 	api           *Filen
 	buffer        []chunkState // Fixed-size circular buffer of chunks
 	chunkIndex    int          // Index of the current chunk being read
@@ -102,7 +103,7 @@ type ChunkedReader struct {
 }
 
 // newChunkedReader creates a new ChunkedReader for sequential reading
-func newChunkedReader(ctx context.Context, api *Filen, file *File) *ChunkedReader {
+func newChunkedReader(ctx context.Context, api *Filen, file *types.File) *ChunkedReader {
 	ctx, cancel := context.WithCancelCause(ctx)
 	bufferSize := min(MaxBufferSize, file.Chunks)
 

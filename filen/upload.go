@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"hash"
 	"io"
 	"strconv"
@@ -15,7 +16,7 @@ import (
 )
 
 type FileUpload struct {
-	IncompleteFile
+	types.IncompleteFile
 	uploadKey string
 	ctx       context.Context
 	cancel    context.CancelCauseFunc
@@ -32,7 +33,7 @@ type FileMetadata struct {
 	Hash         string `json:"hash"`
 }
 
-func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *IncompleteFile) *FileUpload {
+func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *types.IncompleteFile) *FileUpload {
 	return &FileUpload{
 		IncompleteFile: *file,
 		uploadKey:      crypto.GenerateRandomString(32),
@@ -112,7 +113,7 @@ func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash str
 	}, nil
 }
 
-func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, size int) (*File, error) {
+func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, size int) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeRequestFromUploader(fu, size, fileHash)
 	if err != nil {
@@ -123,7 +124,7 @@ func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, s
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}
 
-	return &File{
+	return &types.File{
 		IncompleteFile: fu.IncompleteFile,
 		Size:           size,
 		Region:         region,
@@ -133,7 +134,7 @@ func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, s
 	}, nil
 }
 
-func (api *Filen) completeUploadEmpty(fu *FileUpload) (*File, error) {
+func (api *Filen) completeUploadEmpty(fu *FileUpload) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeEmptyRequestFromUploader(fu, fileHash)
 	if err != nil {
@@ -144,7 +145,7 @@ func (api *Filen) completeUploadEmpty(fu *FileUpload) (*File, error) {
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}
 
-	return &File{
+	return &types.File{
 		IncompleteFile: fu.IncompleteFile,
 		Size:           0,
 		Region:         "",
@@ -155,7 +156,7 @@ func (api *Filen) completeUploadEmpty(fu *FileUpload) (*File, error) {
 
 }
 
-func (api *Filen) UploadFile(ctx context.Context, file *IncompleteFile, r io.Reader) (*File, error) {
+func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil) // Ensure context is canceled when we exit
 
