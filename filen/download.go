@@ -39,7 +39,7 @@ func NewCtxMutex() CtxMutex {
 func (m *CtxMutex) Lock(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return context.Cause(ctx)
 	case m.channel <- struct{}{}:
 		return nil
 	}
