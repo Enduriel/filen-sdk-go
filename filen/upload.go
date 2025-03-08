@@ -2,10 +2,13 @@ package filen
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"hash"
 	"io"
 	"strconv"
 	"sync"
@@ -16,6 +19,7 @@ type FileUpload struct {
 	uploadKey string
 	ctx       context.Context
 	cancel    context.CancelCauseFunc
+	hasher    hash.Hash
 }
 
 type FileMetadata struct {
@@ -25,6 +29,7 @@ type FileMetadata struct {
 	Key          string `json:"key"`
 	LastModified int    `json:"lastModified"`
 	Created      int    `json:"created"`
+	Hash         string `json:"hash"`
 }
 
 func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *IncompleteFile) *FileUpload {
@@ -33,10 +38,10 @@ func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseF
 		uploadKey:      crypto.GenerateRandomString(32),
 		ctx:            ctx,
 		cancel:         cancel,
+		hasher:         sha512.New(),
 	}
 }
 
-// TODO, do not forget to overallocate for data (encryption overhead)
 func (api *Filen) uploadChunk(fu *FileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
 	data = fu.EncryptionKey.EncryptData(data)
 	response, err := api.client.PostV3Upload(fu.ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
@@ -59,7 +64,7 @@ func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *FileUpload) *client.V3U
 	}
 }
 
-func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload) (*client.V3UploadEmptyRequest, error) {
+func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
 	metadata := FileMetadata{
 		Name:         fu.Name,
 		Size:         0,
@@ -67,6 +72,7 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload) (*client.V3Upload
 		Key:          fu.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
 		LastModified: int(fu.LastModified.UnixMilli()),
 		Created:      int(fu.Created.UnixMilli()),
+		Hash:         fileHash,
 	}
 
 	metadataStr, err := json.Marshal(metadata)
@@ -79,7 +85,7 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload) (*client.V3Upload
 	return emptyRequest, nil
 }
 
-func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int) (*client.V3UploadDoneRequest, error) {
+func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
 	metadata := FileMetadata{
 		Name:         fu.Name,
 		Size:         size,
@@ -87,6 +93,7 @@ func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int) (*client.V3U
 		Key:          fu.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
 		LastModified: int(fu.LastModified.UnixMilli()),
 		Created:      int(fu.Created.UnixMilli()),
+		Hash:         fileHash,
 	}
 
 	metadataStr, err := json.Marshal(metadata)
@@ -106,7 +113,8 @@ func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int) (*client.V3U
 }
 
 func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, size int) (*File, error) {
-	uploadRequest, err := api.makeRequestFromUploader(fu, size)
+	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
+	uploadRequest, err := api.makeRequestFromUploader(fu, size, fileHash)
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
 	}
@@ -121,11 +129,13 @@ func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, s
 		Region:         region,
 		Bucket:         bucket,
 		Chunks:         (size / ChunkSize) + 1,
+		Hash:           fileHash,
 	}, nil
 }
 
 func (api *Filen) completeUploadEmpty(fu *FileUpload) (*File, error) {
-	uploadRequest, err := api.makeEmptyRequestFromUploader(fu)
+	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
+	uploadRequest, err := api.makeEmptyRequestFromUploader(fu, fileHash)
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
 	}
@@ -139,6 +149,8 @@ func (api *Filen) completeUploadEmpty(fu *FileUpload) (*File, error) {
 		Size:           0,
 		Region:         "",
 		Bucket:         "",
+		Chunks:         0,
+		Hash:           fileHash,
 	}, nil
 
 }
@@ -167,6 +179,7 @@ func (api *Filen) UploadFile(ctx context.Context, file *IncompleteFile, r io.Rea
 			if read < ChunkSize {
 				data = data[:read]
 			}
+			fileUpload.hasher.Write(data)
 
 			select {
 			case <-ctx.Done():

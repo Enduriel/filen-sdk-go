@@ -61,6 +61,7 @@ func (api *Filen) UpdateMeta(ctx context.Context, file *File) error {
 		Key:          file.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
 		LastModified: int(file.LastModified.UnixMilli()),
 		Created:      int(file.Created.UnixMilli()),
+		Hash:         file.Hash,
 	}
 	metadataStr, err := json.Marshal(metaData)
 	if err != nil {

@@ -87,6 +87,7 @@ type File struct {
 	Region    string // the file's storage region
 	Bucket    string // the file's storage bucket
 	Chunks    int    // how many 1 MiB chunks the file is partitioned into
+	Hash      string // the file's SHA512 hash
 }
 
 // Directory represents a directory on the cloud drive.
@@ -242,6 +243,7 @@ func (api *Filen) ReadDirectory(ctx context.Context, uuid string) ([]*File, []*D
 			Region:    file.Region,
 			Bucket:    file.Bucket,
 			Chunks:    file.Chunks,
+			Hash:      metadata.Hash,
 		})
 	}
 
