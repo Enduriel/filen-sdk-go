@@ -86,6 +86,29 @@ func TestReadDirectories(t *testing.T) {
 	}
 }
 
+func TestSerialization(t *testing.T) {
+	//osFile, err := os.Create("cache/login.filen")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	buffer := bytes.NewBuffer(make([]byte, 0, 1024*1024))
+	err := filen.SerializeTo(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//_, err = osFile.Seek(0, io.SeekStart)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	deserialized, err := sdk.DeserializeFrom(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(filen, deserialized) {
+		t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, deserialized)
+	}
+}
+
 func TestDirectoryActions(t *testing.T) {
 	newPath := "/abc/def/ghi"
 	var directory *types.Directory
