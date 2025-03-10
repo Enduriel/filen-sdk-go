@@ -214,8 +214,13 @@ func TestSerialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	deserializedClient := deserialized.Client
+	deserialized.Client = filen.Client
 	if !reflect.DeepEqual(filen, deserialized) {
 		t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, deserialized)
+	}
+	if filen.Client.APIKey != deserializedClient.APIKey {
+		t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, deserializedClient.APIKey)
 	}
 }
 
@@ -352,12 +357,17 @@ func TestEmptyFileActions(t *testing.T) {
 }
 
 func TestNewWithAPIKey(t *testing.T) {
-	filen2, err := sdk.NewWithAPIKey(context.Background(), os.Getenv("TEST_EMAIL"), os.Getenv("TEST_PASSWORD"), filen.GetAPIKey())
+	filen2, err := sdk.NewWithAPIKey(context.Background(), os.Getenv("TEST_EMAIL_V3"), os.Getenv("TEST_PASSWORD_V3"), filen.GetAPIKey())
 	if err != nil {
 		t.Fatal(err)
 	}
+	newClient := filen2.Client
+	filen2.Client = filen.Client
 	if !reflect.DeepEqual(filen, filen2) {
 		t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, filen2)
+	}
+	if filen.Client.APIKey != newClient.APIKey {
+		t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, filen2.Client.APIKey)
 	}
 }
 

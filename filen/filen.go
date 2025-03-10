@@ -33,7 +33,7 @@ type Filen struct {
 // New creates a new Filen and initializes it with the given email and password
 // by logging in with the API and preparing the API key and master keys.
 func New(ctx context.Context, email, password string) (*Filen, error) {
-	unauthorizedClient := client.New()
+	unauthorizedClient := client.New(ctx)
 
 	// fetch salt
 	authInfo, err := unauthorizedClient.PostV3AuthInfo(ctx, email)
@@ -55,7 +55,7 @@ func New(ctx context.Context, email, password string) (*Filen, error) {
 
 // NewWithAPIKey creates a new Filen and initializes it with the given email, password, and API key
 func NewWithAPIKey(ctx context.Context, email, password, apiKey string) (*Filen, error) {
-	c := client.NewWithAPIKey(apiKey)
+	c := client.NewWithAPIKey(ctx, apiKey)
 
 	authInfo, err := c.PostV3AuthInfo(ctx, email)
 	if err != nil {

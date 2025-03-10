@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rclone/rclone/fs/fshttp"
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type UnauthorizedClient struct {
@@ -24,9 +24,9 @@ type Client struct {
 	APIKey string // the Filen API key
 }
 
-func New() *UnauthorizedClient {
+func New(ctx context.Context) *UnauthorizedClient {
 	return &UnauthorizedClient{
-		httpClient: http.Client{Timeout: 10 * time.Second},
+		httpClient: *fshttp.NewClient(ctx),
 	}
 }
 
@@ -37,9 +37,9 @@ func (uc *UnauthorizedClient) Authorize(apiKey string) *Client {
 	}
 }
 
-func NewWithAPIKey(apiKey string) *Client {
+func NewWithAPIKey(ctx context.Context, apiKey string) *Client {
 	return &Client{
-		UnauthorizedClient: *New(),
+		UnauthorizedClient: *New(ctx),
 		APIKey:             apiKey,
 	}
 }

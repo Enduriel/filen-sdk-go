@@ -1,6 +1,7 @@
 package filen
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/gob"
 	"fmt"
@@ -69,10 +70,7 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 	}
 
 	return &Filen{
-		Client: &client.Client{
-			UnauthorizedClient: *client.New(),
-			APIKey:             s.APIKey,
-		},
+		Client:         client.NewWithAPIKey(context.Background(), s.APIKey),
 		AuthVersion:    s.AuthVersion,
 		Email:          s.Email,
 		MasterKeys:     masterKeys,
