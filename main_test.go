@@ -24,9 +24,9 @@ func setupEnv() error {
 		println("Warning: Error loading .env file: ", err.Error())
 	}
 
-	email := os.Getenv("TEST_EMAIL")       // todo fill from env
-	password := os.Getenv("TEST_PASSWORD") // todo fill from env
-	filen, err = sdk.New(email, password)
+	email := os.Getenv("TEST_EMAIL")
+	password := os.Getenv("TEST_PASSWORD")
+	filen, err = sdk.New(context.Background(), email, password)
 	if err != nil {
 		panic(err)
 	}
@@ -226,6 +226,16 @@ func TestEmptyFileActions(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestNewWithAPIKey(t *testing.T) {
+	filen2, err := sdk.NewWithAPIKey(context.Background(), os.Getenv("TEST_EMAIL"), os.Getenv("TEST_PASSWORD"), filen.GetAPIKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(filen, filen2) {
+		t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, filen2)
+	}
 }
 
 func TestFileActions(t *testing.T) {

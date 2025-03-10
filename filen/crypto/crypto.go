@@ -20,6 +20,11 @@ import (
 	"strings"
 )
 
+type MetaCrypter interface {
+	EncryptMeta(metadata string) EncryptedString
+	DecryptMeta(encrypted EncryptedString) (string, error)
+}
+
 // EncryptedString denotes that a string is encrypted and can't be used meaningfully before being decrypted.
 type EncryptedString string
 
@@ -36,7 +41,7 @@ func NewEncryptedStringV3(encrypted []byte, nonce [12]byte) EncryptedString {
 // v1 and v2
 type MasterKeys []MasterKey
 
-func NewMasterKeys(encryptionKey *MasterKey, stringKeys string) (MasterKeys, error) {
+func NewMasterKeys(encryptionKey MasterKey, stringKeys string) (MasterKeys, error) {
 	keys := make([]MasterKey, 0)
 	for _, key := range strings.Split(stringKeys, "|") {
 		if len(key) != 64 {
@@ -48,14 +53,12 @@ func NewMasterKeys(encryptionKey *MasterKey, stringKeys string) (MasterKeys, err
 		if err != nil {
 			return nil, fmt.Errorf("NewMasterKey: %w", err)
 		}
-		if encryptionKey != nil && encryptionKey.DerivedBytes == mk.DerivedBytes {
+		if encryptionKey.DerivedBytes == mk.DerivedBytes {
 			continue
 		}
 		keys = append(keys, *mk)
 	}
-	if encryptionKey != nil {
-		keys = slices.Insert(keys, 0, *encryptionKey)
-	}
+	keys = slices.Insert(keys, 0, encryptionKey)
 	return keys, nil
 }
 

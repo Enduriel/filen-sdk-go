@@ -37,6 +37,13 @@ func (uc *UnauthorizedClient) Authorize(apiKey string) *Client {
 	}
 }
 
+func NewWithAPIKey(apiKey string) *Client {
+	return &Client{
+		UnauthorizedClient: *New(),
+		APIKey:             apiKey,
+	}
+}
+
 // A RequestError carries information on a failed HTTP request.
 type RequestError struct {
 	Message         string    // description of where the error occurred
