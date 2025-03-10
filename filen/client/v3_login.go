@@ -21,13 +21,13 @@ type V3LoginResponse struct {
 }
 
 // PostV3Login calls /v3/login.
-func (uc *UnauthorizedClient) PostV3Login(ctx context.Context, email string, password crypto.DerivedPassword) (*V3LoginResponse, error) {
+func (uc *UnauthorizedClient) PostV3Login(ctx context.Context, email string, password crypto.DerivedPassword, authVersion int) (*V3LoginResponse, error) {
 	response := &V3LoginResponse{}
 	_, err := uc.RequestData(ctx, "POST", GatewayURL("/v3/login"), v3loginRequest{
 		Email:         email,
 		Password:      string(password),
 		TwoFactorCode: "XXXXXX",
-		AuthVersion:   2, // TODO: make this configurable
+		AuthVersion:   authVersion,
 	}, response)
 	return response, err
 }

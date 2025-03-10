@@ -132,7 +132,7 @@ func loginV2(ctx context.Context, email, password string, info client.V3AuthInfo
 		return nil, nil, fmt.Errorf("DeriveMKAndAuthFromPassword: %w", err)
 	}
 	// for simplicity, I'm going to ignore the fact that response here contains the RSAKeypair
-	response, err := uc.PostV3Login(ctx, email, derivedPass)
+	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to log in: %w", err)
 	}
@@ -146,7 +146,7 @@ func loginV3(ctx context.Context, email, password string, info client.V3AuthInfo
 		return nil, nil, fmt.Errorf("DeriveKEKAndAuthFromPassword: %w", err)
 	}
 	// for simplicity, I'm going to ignore the fact that response here contains the RSAKeypair
-	response, err := uc.PostV3Login(ctx, email, derivedPass)
+	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to log in: %w", err)
 	}
