@@ -2,8 +2,11 @@ package filen
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
+	"hash"
 	"io"
 	"sync"
 )
@@ -100,6 +103,7 @@ type ChunkedReader struct {
 	ctx           context.Context
 	cancel        context.CancelCauseFunc
 	errOnce       *sync.Once
+	hasher        hash.Hash
 }
 
 // newChunkedReader creates a new ChunkedReader for sequential reading
@@ -116,6 +120,7 @@ func newChunkedReader(ctx context.Context, api *Filen, file *types.File) *Chunke
 		ctx:           ctx,
 		cancel:        cancel,
 		errOnce:       &sync.Once{},
+		hasher:        sha512.New(),
 	}
 
 	// Init and prefetch initial chunks
@@ -177,7 +182,7 @@ func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 			if read == 0 {
 				return 0, io.EOF
 			}
-			return read, nil
+			break
 		}
 
 		currentChunk := &r.buffer[r.chunkIndex%len(r.buffer)]
@@ -200,12 +205,24 @@ func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 			r.chunkIndex++
 		}
 	}
-
+	r.hasher.Write(p[:read])
 	return read, nil
 }
 
 // Close cleans up resources used by the reader
 func (r *ChunkedReader) Close() error {
 	r.cancel(fmt.Errorf("reader closed")) // Cancel all ongoing operations
+
+	if r.chunkIndex < r.file.Chunks {
+		// incomplete read
+		return nil
+	}
+	if r.file.Hash != "" {
+		h := hex.EncodeToString(r.hasher.Sum(nil))
+		if r.file.Hash != h {
+			return fmt.Errorf("hash mismatch: expected %s, got %s", r.file.Hash, h)
+		}
+	}
+	// should we be replacing the hash if it's empty?
 	return nil
 }

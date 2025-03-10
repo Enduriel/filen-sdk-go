@@ -22,7 +22,8 @@ func (api *Filen) DownloadToPath(ctx context.Context, file *types.File, download
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	fName := f.Name()
-	_, err = f.ReadFrom(api.GetDownloadReader(ctx, file))
+	downloader := api.GetDownloadReader(ctx, file)
+	_, err = f.ReadFrom(downloader)
 	errClose := f.Close()
 	if err != nil {
 		_ = os.Remove(fName)
@@ -31,6 +32,12 @@ func (api *Filen) DownloadToPath(ctx context.Context, file *types.File, download
 			return fmt.Errorf("download file: %w", maybeErr)
 		}
 		return fmt.Errorf("download file: %w", err)
+	}
+
+	err = downloader.Close()
+	if err != nil {
+		_ = os.Remove(fName)
+		return fmt.Errorf("close downloader: %w", err)
 	}
 
 	if errClose != nil {
