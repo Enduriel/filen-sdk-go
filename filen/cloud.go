@@ -189,7 +189,7 @@ func (api *Filen) CreateDirectory(ctx context.Context, parentUUID string, name s
 	if err != nil {
 		return nil, err
 	}
-	metadataEncrypted := api.MasterKeys.EncryptMeta(string(metadataStr))
+	metadataEncrypted := api.EncryptMeta(string(metadataStr))
 
 	// hash name
 	nameHashed := api.HashFileName(name)
