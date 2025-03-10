@@ -112,6 +112,19 @@ func TestSerialization(t *testing.T) {
 func TestDirectoryActions(t *testing.T) {
 	newPath := "/abc/def/ghi"
 	var directory *types.Directory
+	t.Run("GetBaseFolder", func(t *testing.T) {
+		dirOrRoot, err := filen.FindItem(context.Background(), "", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dir, ok := dirOrRoot.(*types.RootDirectory); ok {
+			if dir.GetUUID() != filen.BaseFolderUUID {
+				t.Fatalf("root directory did not match")
+			}
+		} else {
+			t.Fatal("dirOrRoot is not a root directory")
+		}
+	})
 	t.Run("Create FindDirectoryOrCreate", func(t *testing.T) {
 		dirOrRoot, err := filen.FindDirectoryOrCreate(context.Background(), newPath)
 		if err != nil {
