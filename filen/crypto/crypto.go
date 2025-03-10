@@ -258,13 +258,17 @@ func (key *EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 
 func (key *EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
 	if metadata[0:3] != "003" {
-		return "", fmt.Errorf("unknown metadata format")
+		return "", fmt.Errorf("unsupported metadata %s format (allowed: 003)", metadata[0:3])
 	}
 	nonce, err := hex.DecodeString(string(metadata[3:27]))
 	if err != nil {
 		return "", fmt.Errorf("decoding nonce: %v", err)
 	}
-	decrypted, err := key.Cipher.Open(nil, nonce[:], []byte(metadata[27:]), nil)
+	decoded, err := base64.StdEncoding.DecodeString(string(metadata[27:]))
+	if err != nil {
+		return "", fmt.Errorf("decoding metadata: %v", err)
+	}
+	decrypted, err := key.Cipher.Open(nil, nonce[:], decoded, nil)
 	if err != nil {
 		return "", fmt.Errorf("decrypting: %v", err)
 	}
@@ -299,15 +303,13 @@ func (key *EncryptionKey) ToString() string {
 }
 
 func DeriveKEKAndAuthFromPassword(password string, salt string) (*EncryptionKey, DerivedPassword, error) {
-	derived := argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64)
-	var rawKEK [32]byte
-	copy(rawKEK[:], derived[:32])
+	derived := hex.EncodeToString(argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64))
 
-	kek, err := MakeEncryptionKeyFromBytes(rawKEK)
+	kek, err := MakeEncryptionKeyFromStr(derived[:len(derived)/2])
 	if err != nil {
 		return nil, "", fmt.Errorf("MakeEncryptionKeyFromBytes: %v", err)
 	}
-	return kek, DerivedPassword(hex.EncodeToString(derived[32:])), nil
+	return kek, DerivedPassword(derived[len(derived)/2:]), nil
 }
 
 // file

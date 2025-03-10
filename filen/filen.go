@@ -218,6 +218,7 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 	return &Filen{
 		client:         c,
 		Email:          email,
+		MasterKeys:     make(crypto.MasterKeys, 0),
 		KEK:            kek,
 		DEK:            *dek,
 		PrivateKey:     *privateKey,
