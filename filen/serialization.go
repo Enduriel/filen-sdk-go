@@ -26,7 +26,7 @@ func (api *Filen) serialize() *SerializableFilen {
 		masterKeys[i] = masterKey.Bytes
 	}
 	return &SerializableFilen{
-		APIKey:         api.client.APIKey,
+		APIKey:         api.Client.APIKey,
 		AuthVersion:    api.AuthVersion,
 		Email:          api.Email,
 		MasterKeys:     masterKeys,
@@ -69,7 +69,7 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 	}
 
 	return &Filen{
-		client: &client.Client{
+		Client: &client.Client{
 			UnauthorizedClient: *client.New(),
 			APIKey:             s.APIKey,
 		},

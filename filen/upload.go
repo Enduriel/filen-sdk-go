@@ -45,7 +45,7 @@ func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseF
 
 func (api *Filen) uploadChunk(fu *FileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
 	data = fu.EncryptionKey.EncryptData(data)
-	response, err := api.client.PostV3Upload(fu.ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
+	response, err := api.Client.PostV3Upload(fu.ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
 	if err != nil {
 		return nil, fmt.Errorf("upload chunk %d: %w", chunkIndex, err)
 	}
@@ -119,7 +119,7 @@ func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, s
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
 	}
-	_, err = api.client.PostV3UploadDone(fu.ctx, *uploadRequest)
+	_, err = api.Client.PostV3UploadDone(fu.ctx, *uploadRequest)
 	if err != nil {
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}
@@ -140,7 +140,7 @@ func (api *Filen) completeUploadEmpty(fu *FileUpload) (*types.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
 	}
-	_, err = api.client.PostV3UploadEmpty(fu.ctx, *uploadRequest)
+	_, err = api.Client.PostV3UploadEmpty(fu.ctx, *uploadRequest)
 	if err != nil {
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}

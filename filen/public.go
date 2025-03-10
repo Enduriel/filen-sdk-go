@@ -79,7 +79,7 @@ func (api *Filen) UpdateMeta(ctx context.Context, file *types.File) error {
 	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
 	nameHashed := api.HashFileName(file.Name)
 
-	err = api.client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
+	err = api.Client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
 	if err != nil {
 		return fmt.Errorf("post v3 file metadata: %w", err)
 	}

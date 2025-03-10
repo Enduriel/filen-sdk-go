@@ -11,7 +11,7 @@ import (
 
 // Filen provides the SDK interface. Needs to be initialized via [New].
 type Filen struct {
-	client      *client.Client
+	Client      *client.Client
 	AuthVersion int
 
 	Email string
@@ -172,7 +172,7 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 	}
 
 	return &Filen{
-		client:         c,
+		Client:         c,
 		Email:          email,
 		MasterKeys:     masterKeys,
 		PrivateKey:     *privateKey,
@@ -216,7 +216,7 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		return nil, fmt.Errorf("failed to get base folder: %w", err)
 	}
 	return &Filen{
-		client:         c,
+		Client:         c,
 		Email:          email,
 		MasterKeys:     make(crypto.MasterKeys, 0),
 		KEK:            kek,

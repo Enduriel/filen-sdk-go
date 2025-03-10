@@ -13,7 +13,7 @@ import (
 
 func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, chunkIndex int) ([]byte, error) {
 	// could potentially be optimized by accepting a []byte buffer to reuse
-	encryptedBytes, err := api.client.DownloadFileChunk(ctx, file.UUID, file.Region, file.Bucket, chunkIndex)
+	encryptedBytes, err := api.Client.DownloadFileChunk(ctx, file.UUID, file.Region, file.Bucket, chunkIndex)
 	if err != nil {
 		return nil, fmt.Errorf("downloading chunk %d: %w", chunkIndex, err)
 	}
