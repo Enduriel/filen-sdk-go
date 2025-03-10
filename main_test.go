@@ -48,42 +48,99 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// TestReadDirectories  expects root directory to contain
-//   - large_sample-1mb.txt
-//   - abc.txt
-//   - /def
-//   - /uploads
 func TestReadDirectories(t *testing.T) {
-	files, dirs, err := filen.ReadDirectory(context.Background(), filen.BaseFolderUUID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	expectedDirs := map[string]*types.Directory{}
+	expectedFiles := map[string]*types.File{}
 
-	requiredDirs := map[string]struct{}{"def": {}, "uploads": {}} // ("def" ), "uploads"}
-	for _, dir := range dirs {
-		if _, ok := requiredDirs[dir.Name]; ok {
-			delete(requiredDirs, dir.Name)
-		} else {
-			t.Fatalf("Unexpected directory: %#v\n", dir)
+	t.Run("setup", func(t *testing.T) {
+		var err error
+		def, err := filen.CreateDirectory(context.Background(), filen.BaseFolderUUID, "def")
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-
-	if len(requiredDirs) > 0 {
-		t.Fatalf("Missing directories: %v\n", requiredDirs)
-	}
-
-	requiredFiles := map[string]struct{}{"large_sample-1mb.txt": {}, "abc.txt": {}}
-
-	for _, file := range files {
-		if _, ok := requiredFiles[file.Name]; ok {
-			delete(requiredFiles, file.Name)
-		} else {
-			fmt.Printf("Unexpected file: %#v\n", file)
+		expectedDirs["def"] = def
+		uploads, err := filen.CreateDirectory(context.Background(), filen.BaseFolderUUID, "uploads")
+		if err != nil {
+			t.Fatal(err)
 		}
+		expectedDirs["uploads"] = uploads
+		incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), filen.BaseFolderUUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		largeSample, err := filen.UploadFile(context.Background(), incompleteFile, bytes.NewReader([]byte("Sample!")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedFiles["large_sample-1mb.txt"] = largeSample
+		incompleteFile, err = types.NewIncompleteFile(filen.AuthVersion, "abc.txt", filen.BaseFolderUUID, time.Now(), time.Now(), filen.BaseFolderUUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		abc, err := filen.UploadFile(context.Background(), incompleteFile, bytes.NewReader([]byte("ABC!")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedFiles["abc.txt"] = abc
+	})
+
+	requiredDirs := map[string]*types.Directory{}
+	requiredFiles := map[string]*types.File{}
+
+	for k, v := range expectedDirs {
+		requiredDirs[k] = v
 	}
-	if len(requiredFiles) > 0 {
-		t.Fatalf("Missing files: %v\n", requiredFiles)
+	for k, v := range expectedFiles {
+		requiredFiles[k] = v
 	}
+
+	t.Run("Check", func(t *testing.T) {
+		files, dirs, err := filen.ReadDirectory(context.Background(), filen.BaseFolderUUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, dir := range dirs {
+			if requiredDir, ok := requiredDirs[dir.Name]; ok {
+				if !reflect.DeepEqual(dir, requiredDir) {
+					t.Fatalf("Directory %s does not match found:\n%#v\nExpected:\n%#v\n", dir.Name, dir, requiredDir)
+				}
+				delete(requiredDirs, dir.Name)
+			}
+		}
+
+		if len(requiredDirs) > 0 {
+			t.Fatalf("Missing directories: %v\n", requiredDirs)
+		}
+
+		for _, file := range files {
+			if requiredFile, ok := requiredFiles[file.Name]; ok {
+				if !reflect.DeepEqual(file, requiredFile) {
+					t.Fatalf("File %s does not match found:\n%#v\nExpected:\n%#v\n", file.Name, file, requiredFile)
+				}
+				delete(requiredFiles, file.Name)
+			}
+		}
+		if len(requiredFiles) > 0 {
+			t.Fatalf("Missing files: %v\n", requiredFiles)
+		}
+	})
+
+	t.Run("Cleanup", func(t *testing.T) {
+		for _, dir := range expectedDirs {
+			err := filen.TrashDirectory(context.Background(), dir.UUID)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		for _, file := range expectedFiles {
+			err := filen.TrashFile(context.Background(), file.UUID)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
 }
 
 func TestSerialization(t *testing.T) {
