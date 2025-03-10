@@ -37,15 +37,6 @@ func (api *Filen) serialize() *SerializableFilen {
 	}
 }
 
-func allZero(s []byte) bool {
-	for _, v := range s {
-		if v != 0 {
-			return false
-		}
-	}
-	return true
-}
-
 func (s *SerializableFilen) deserialize() (*Filen, error) {
 	masterKeys := make([]crypto.MasterKey, len(s.MasterKeys))
 	for i, masterKey := range s.MasterKeys {
