@@ -48,6 +48,59 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// TestUploadsToGoDir uploads test files and directories to the "go" directory
+// this is so the TS sdk can validate these files on its side and check if they are compatible
+// there should ideally be a TestDownloadsFromTSDir that validates files from the TS sdk
+func TestUploadsToGoDir(t *testing.T) {
+	goDir, err := filen.FindDirectoryOrCreate(context.Background(), "go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	maybeTestDir, err := filen.FindItem(context.Background(), "test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if maybeTestDir != nil {
+		err = filen.TrashDirectory(context.Background(), maybeTestDir.GetUUID())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err = filen.CreateDirectory(context.Background(), goDir.GetUUID(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testFile, err := types.NewIncompleteFile(filen.AuthVersion, "hello.txt", "", time.Now(), time.Now(), goDir.GetUUID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = filen.UploadFile(context.Background(), testFile, bytes.NewReader([]byte("Hello World From Go!")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	testEmptyFile, err := types.NewIncompleteFile(filen.AuthVersion, "empty.txt", "", time.Now(), time.Now(), goDir.GetUUID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = filen.UploadFile(context.Background(), testEmptyFile, bytes.NewReader([]byte("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-20mb.txt", "", time.Now(), time.Now(), goDir.GetUUID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	osFile, err := os.Open("test_files/large_sample-20mb.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = filen.UploadFile(context.Background(), testBigFile, osFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReadDirectories(t *testing.T) {
 	expectedDirs := map[string]*types.Directory{}
 	expectedFiles := map[string]*types.File{}
