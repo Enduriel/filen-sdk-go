@@ -1,39 +1,16 @@
 package crypto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha512"
-	"golang.org/x/crypto/pbkdf2"
 	"math/big"
 )
-
-func runPBKDF2(password string, salt string, iterations int, bitLength int) []byte {
-	return pbkdf2.Key([]byte(password), []byte(salt), iterations, bitLength/8, sha512.New)
-}
 
 func RunSHA521(b []byte) []byte {
 	hasher := sha512.New()
 	hasher.Write(b)
 	return hasher.Sum(nil)
-}
-
-func runAES256GCMDecryption(key []byte, nonce []byte, ciphertext []byte) ([]byte, error) {
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(c)
-	if err != nil {
-		return nil, err
-	}
-	result, err := gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 // GenerateRandomString generates a cryptographically secure random string based on a selection of alphanumerical characters.
@@ -58,20 +35,6 @@ func GenerateRandomBytes(length int) []byte {
 		panic(err)
 	}
 	return b
-}
-
-func runAES256GCMEncryption(key []byte, nonce []byte, plaintext []byte) ([]byte, error) {
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(c)
-	if err != nil {
-		return nil, err
-	}
-	var result []byte
-	result = gcm.Seal(nil, nonce, plaintext, nil)
-	return result, nil
 }
 
 // Simplified EVP_BytesToKey implementation
