@@ -38,7 +38,7 @@ func NewIncompleteFile(authVersion int, name string, mimeType string, created ti
 
 	return &IncompleteFile{
 		UUID:          uuid.NewString(),
-		Name:          filepath.Base(name),
+		Name:          name,
 		MimeType:      mimeType,
 		EncryptionKey: *key,
 		Created:       created.Round(time.Millisecond),
@@ -53,7 +53,7 @@ func NewIncompleteFileFromOSFile(authVersion int, osFile *os.File, parent Direct
 		return nil, fmt.Errorf("stat file: %w", err)
 	}
 	created := io.GetCreationTime(fileStat)
-	return NewIncompleteFile(authVersion, osFile.Name(), "", created, fileStat.ModTime(), parent)
+	return NewIncompleteFile(authVersion, filepath.Base(osFile.Name()), "", created, fileStat.ModTime(), parent)
 }
 
 // File represents a file on the cloud drive.
