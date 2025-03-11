@@ -45,7 +45,7 @@ func NewMasterKeys(encryptionKey MasterKey, stringKeys string) (MasterKeys, erro
 	keys := make([]MasterKey, 0)
 	for _, key := range strings.Split(stringKeys, "|") {
 		if len(key) != 64 {
-			return nil, fmt.Errorf("key length wrong %s")
+			return nil, fmt.Errorf("key length wrong %d", len(key))
 		}
 		keyBytes := []byte(key)
 		keySized := [64]byte(keyBytes)
