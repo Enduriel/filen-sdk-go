@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"io"
 )
 
@@ -34,7 +35,7 @@ func (api *Filen) serialize() *SerializableFilen {
 		DEK:            api.DEK.Bytes,
 		KEK:            api.KEK.Bytes,
 		PrivateKey:     x509.MarshalPKCS1PrivateKey(&api.PrivateKey),
-		BaseFolderUUID: api.BaseFolderUUID,
+		BaseFolderUUID: api.BaseFolder.GetUUID(),
 	}
 }
 
@@ -70,15 +71,15 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 	}
 
 	return &Filen{
-		Client:         client.NewWithAPIKey(context.Background(), s.APIKey),
-		AuthVersion:    s.AuthVersion,
-		Email:          s.Email,
-		MasterKeys:     masterKeys,
-		DEK:            dek,
-		KEK:            kek,
-		PrivateKey:     *privateKey,
-		PublicKey:      privateKey.PublicKey,
-		BaseFolderUUID: s.BaseFolderUUID,
+		Client:      client.NewWithAPIKey(context.Background(), s.APIKey),
+		AuthVersion: s.AuthVersion,
+		Email:       s.Email,
+		MasterKeys:  masterKeys,
+		DEK:         dek,
+		KEK:         kek,
+		PrivateKey:  *privateKey,
+		PublicKey:   privateKey.PublicKey,
+		BaseFolder:  types.NewRootDirectory(s.BaseFolderUUID),
 	}, nil
 }
 

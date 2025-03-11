@@ -74,18 +74,18 @@ func TestUploadsToGoDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if maybeTestDir != nil {
-		err = filen.TrashDirectory(context.Background(), maybeTestDir.GetUUID())
+	if testDir, ok := maybeTestDir.(*types.Directory); ok {
+		err = filen.TrashDirectory(context.Background(), testDir)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err = filen.CreateDirectory(context.Background(), goDir.GetUUID(), "test")
+	_, err = filen.CreateDirectory(context.Background(), goDir, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testFile, err := types.NewIncompleteFile(filen.AuthVersion, "hello.txt", "", time.Now(), time.Now(), goDir.GetUUID())
+	testFile, err := types.NewIncompleteFile(filen.AuthVersion, "hello.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestUploadsToGoDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEmptyFile, err := types.NewIncompleteFile(filen.AuthVersion, "empty.txt", "", time.Now(), time.Now(), goDir.GetUUID())
+	testEmptyFile, err := types.NewIncompleteFile(filen.AuthVersion, "empty.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestUploadsToGoDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-20mb.txt", "", time.Now(), time.Now(), goDir.GetUUID())
+	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-20mb.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,17 +121,17 @@ func TestReadDirectories(t *testing.T) {
 
 	t.Run("setup", func(t *testing.T) {
 		var err error
-		def, err := filen.CreateDirectory(context.Background(), filen.BaseFolderUUID, "def")
+		def, err := filen.CreateDirectory(context.Background(), &filen.BaseFolder, "def")
 		if err != nil {
 			t.Fatal(err)
 		}
 		expectedDirs["def"] = def
-		uploads, err := filen.CreateDirectory(context.Background(), filen.BaseFolderUUID, "uploads")
+		uploads, err := filen.CreateDirectory(context.Background(), &filen.BaseFolder, "uploads")
 		if err != nil {
 			t.Fatal(err)
 		}
 		expectedDirs["uploads"] = uploads
-		incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), filen.BaseFolderUUID)
+		incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), &filen.BaseFolder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,7 +140,7 @@ func TestReadDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 		expectedFiles["large_sample-1mb.txt"] = largeSample
-		incompleteFile, err = types.NewIncompleteFile(filen.AuthVersion, "abc.txt", filen.BaseFolderUUID, time.Now(), time.Now(), filen.BaseFolderUUID)
+		incompleteFile, err = types.NewIncompleteFile(filen.AuthVersion, "abc.txt", "", time.Now(), time.Now(), &filen.BaseFolder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -162,7 +162,7 @@ func TestReadDirectories(t *testing.T) {
 	}
 
 	t.Run("Check", func(t *testing.T) {
-		files, dirs, err := filen.ReadDirectory(context.Background(), filen.BaseFolderUUID)
+		files, dirs, err := filen.ReadDirectory(context.Background(), filen.BaseFolder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -195,14 +195,14 @@ func TestReadDirectories(t *testing.T) {
 
 	t.Run("Cleanup", func(t *testing.T) {
 		for _, dir := range expectedDirs {
-			err := filen.TrashDirectory(context.Background(), dir.UUID)
+			err := filen.TrashDirectory(context.Background(), dir)
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
 
 		for _, file := range expectedFiles {
-			err := filen.TrashFile(context.Background(), file.UUID)
+			err := filen.TrashFile(context.Background(), *file)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -247,7 +247,7 @@ func TestDirectoryActions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if dir, ok := dirOrRoot.(*types.RootDirectory); ok {
-			if dir.GetUUID() != filen.BaseFolderUUID {
+			if dir.GetUUID() != filen.BaseFolder.GetUUID() {
 				t.Fatalf("root directory did not match")
 			}
 		} else {
@@ -280,7 +280,7 @@ func TestDirectoryActions(t *testing.T) {
 		}
 	})
 	t.Run("Trash", func(t *testing.T) {
-		err := filen.TrashDirectory(context.Background(), directory.UUID)
+		err := filen.TrashDirectory(context.Background(), directory)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestDirectoryActions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if dir, ok := dir.(*types.Directory); ok {
-			err := filen.TrashDirectory(context.Background(), dir.UUID)
+			err := filen.TrashDirectory(context.Background(), dir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -312,7 +312,7 @@ func TestEmptyFileActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, filen.BaseFolderUUID)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, filen.BaseFolder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +363,7 @@ func TestEmptyFileActions(t *testing.T) {
 		}
 	})
 	t.Run("Trash", func(t *testing.T) {
-		err = filen.TrashFile(context.Background(), file.UUID)
+		err = filen.TrashFile(context.Background(), *file)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -389,8 +389,7 @@ func TestFileActions(t *testing.T) {
 	fileName := "large_sample-20mb.txt"
 	osFile, err := os.Open("test_files/" + fileName)
 
-	uploadsDirUUID := filen.BaseFolderUUID
-	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, uploadsDirUUID)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, filen.BaseFolder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +451,7 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Trash", func(t *testing.T) {
-		err = filen.TrashFile(context.Background(), file.UUID)
+		err = filen.TrashFile(context.Background(), *file)
 		if err != nil {
 			t.Fatal(err)
 		}

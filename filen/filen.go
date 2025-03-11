@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
 // Filen provides the SDK interface. Needs to be initialized via [New].
@@ -27,7 +28,7 @@ type Filen struct {
 	PublicKey  rsa.PublicKey
 
 	// BaseFolderUUID is the UUID of the cloud drive's root directory
-	BaseFolderUUID string
+	BaseFolder types.RootDirectory
 }
 
 // New creates a new Filen and initializes it with the given email and password
@@ -172,13 +173,13 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 	}
 
 	return &Filen{
-		Client:         c,
-		Email:          email,
-		MasterKeys:     masterKeys,
-		PrivateKey:     *privateKey,
-		PublicKey:      *publicKey,
-		BaseFolderUUID: baseFolderResponse.UUID,
-		AuthVersion:    info.AuthVersion,
+		Client:      c,
+		Email:       email,
+		MasterKeys:  masterKeys,
+		PrivateKey:  *privateKey,
+		PublicKey:   *publicKey,
+		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
+		AuthVersion: info.AuthVersion,
 	}, nil
 }
 
@@ -216,15 +217,15 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		return nil, fmt.Errorf("failed to get base folder: %w", err)
 	}
 	return &Filen{
-		Client:         c,
-		Email:          email,
-		MasterKeys:     make(crypto.MasterKeys, 0),
-		KEK:            kek,
-		DEK:            *dek,
-		PrivateKey:     *privateKey,
-		PublicKey:      *publicKey,
-		BaseFolderUUID: baseFolderResponse.UUID,
-		AuthVersion:    info.AuthVersion,
+		Client:      c,
+		Email:       email,
+		MasterKeys:  make(crypto.MasterKeys, 0),
+		KEK:         kek,
+		DEK:         *dek,
+		PrivateKey:  *privateKey,
+		PublicKey:   *publicKey,
+		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
+		AuthVersion: info.AuthVersion,
 	}, nil
 }
 

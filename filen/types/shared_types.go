@@ -22,7 +22,7 @@ type IncompleteFile struct {
 	ParentUUID    string               // the [Directory.UUID] of the file's parent directory
 }
 
-func NewIncompleteFile(authVersion int, name string, mimeType string, created time.Time, lastModified time.Time, parentUUID string) (*IncompleteFile, error) {
+func NewIncompleteFile(authVersion int, name string, mimeType string, created time.Time, lastModified time.Time, parent DirectoryInterface) (*IncompleteFile, error) {
 	key, err := crypto.MakeNewFileKey(authVersion)
 	if err != nil {
 		return nil, fmt.Errorf("make new file key: %w", err)
@@ -43,17 +43,17 @@ func NewIncompleteFile(authVersion int, name string, mimeType string, created ti
 		EncryptionKey: *key,
 		Created:       created.Round(time.Millisecond),
 		LastModified:  lastModified.Round(time.Millisecond),
-		ParentUUID:    parentUUID,
+		ParentUUID:    parent.GetUUID(),
 	}, nil
 }
 
-func NewIncompleteFileFromOSFile(authVersion int, osFile *os.File, parentUUID string) (*IncompleteFile, error) {
+func NewIncompleteFileFromOSFile(authVersion int, osFile *os.File, parent DirectoryInterface) (*IncompleteFile, error) {
 	fileStat, err := osFile.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("stat file: %w", err)
 	}
 	created := io.GetCreationTime(fileStat)
-	return NewIncompleteFile(authVersion, osFile.Name(), "", created, fileStat.ModTime(), parentUUID)
+	return NewIncompleteFile(authVersion, osFile.Name(), "", created, fileStat.ModTime(), parent)
 }
 
 // File represents a file on the cloud drive.
@@ -97,44 +97,61 @@ type RootDirectory struct {
 	UUID string
 }
 
-type DirectoryInterface interface {
-	GetUUID() string
-	IsRoot() bool
+func NewRootDirectory(uuid string) RootDirectory {
+	return RootDirectory{UUID: uuid}
 }
 
 type FileSystemObject interface {
 	GetUUID() string
+	GetName() string
 	GetParent() string
 }
 
-func (file *File) GetUUID() string {
+type DirectoryInterface interface {
+	FileSystemObject
+	IsRoot() bool
+}
+
+func (file File) GetUUID() string {
 	return file.IncompleteFile.UUID
 }
 
-func (file *File) GetParent() string {
+func (file File) GetName() string {
+	return file.Name
+}
+
+func (file File) GetParent() string {
 	return file.ParentUUID
 }
 
-func (directory *Directory) GetUUID() string {
+func (directory Directory) GetUUID() string {
 	return directory.UUID
 }
 
-func (directory *Directory) GetParent() string {
+func (directory Directory) GetName() string {
+	return directory.Name
+}
+
+func (directory Directory) GetParent() string {
 	return directory.ParentUUID
 }
 
-func (directory *Directory) IsRoot() bool {
+func (directory Directory) IsRoot() bool {
 	return false
 }
 
-func (rootDirectory *RootDirectory) GetUUID() string {
+func (rootDirectory RootDirectory) GetUUID() string {
 	return rootDirectory.UUID
 }
 
-func (rootDirectory *RootDirectory) GetParent() string {
+func (rootDirectory RootDirectory) GetName() string {
 	return ""
 }
 
-func (rootDirectory *RootDirectory) IsRoot() bool {
+func (rootDirectory RootDirectory) GetParent() string {
+	return ""
+}
+
+func (rootDirectory RootDirectory) IsRoot() bool {
 	return true
 }
