@@ -26,6 +26,9 @@ func setupEnv() error {
 
 	email := os.Getenv("TEST_EMAIL")
 	password := os.Getenv("TEST_PASSWORD")
+	if email == "" || password == "" {
+		return fmt.Errorf("TEST_EMAIL and TEST_PASSWORD environment variables must be set")
+	}
 	filen, err = sdk.New(context.Background(), email, password)
 	if err != nil {
 		panic(err)
