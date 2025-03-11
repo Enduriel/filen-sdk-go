@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -33,8 +34,18 @@ func setupEnv() error {
 	if err != nil {
 		panic(err)
 	}
+	testPath := filepath.Join(".", "test_files")
+	err = os.MkdirAll(testPath, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("creating test_files directory: %w", err)
+	}
 	if err = writeTestFiles(); err != nil {
 		return err
+	}
+	downloadedPath := filepath.Join(".", "downloaded")
+	err = os.MkdirAll(downloadedPath, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("creating downloaded directory: %w", err)
 	}
 	return nil
 }
@@ -458,6 +469,10 @@ func writeTestData(writer io.Writer, length int) error {
 }
 
 func writeTestFiles() error {
+	_, err := os.Create("test_files/empty.txt")
+	if err != nil {
+		return fmt.Errorf("failed to create empty.txt: %w", err)
+	}
 	smallFile, err := os.Create("test_files/large_sample-1mb.txt")
 	if err != nil {
 		return fmt.Errorf("failed to create large_sample-1mb: %w", err)
