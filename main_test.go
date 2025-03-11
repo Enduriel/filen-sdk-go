@@ -360,7 +360,7 @@ func TestEmptyFileActions(t *testing.T) {
 }
 
 func TestNewWithAPIKey(t *testing.T) {
-	filen2, err := sdk.NewWithAPIKey(context.Background(), os.Getenv("TEST_EMAIL_V3"), os.Getenv("TEST_PASSWORD_V3"), filen.GetAPIKey())
+	filen2, err := sdk.NewWithAPIKey(context.Background(), os.Getenv("TEST_EMAIL"), os.Getenv("TEST_PASSWORD"), filen.GetAPIKey())
 	if err != nil {
 		t.Fatal(err)
 	}
