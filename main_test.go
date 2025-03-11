@@ -70,11 +70,11 @@ func TestUploadsToGoDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	maybeTestDir, err := filen.FindItem(context.Background(), "test", true)
+	testDir, err := filen.FindDirectory(context.Background(), "go/test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testDir, ok := maybeTestDir.(*types.Directory); ok {
+	if testDir != nil {
 		err = filen.TrashDirectory(context.Background(), testDir)
 		if err != nil {
 			t.Fatal(err)
@@ -242,7 +242,7 @@ func TestDirectoryActions(t *testing.T) {
 	newPath := "/abc/def/ghi"
 	var directory *types.Directory
 	t.Run("GetBaseFolder", func(t *testing.T) {
-		dirOrRoot, err := filen.FindItem(context.Background(), "", true)
+		dirOrRoot, err := filen.FindDirectory(context.Background(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -285,7 +285,7 @@ func TestDirectoryActions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		dir, err := filen.FindItem(context.Background(), newPath, true)
+		dir, err := filen.FindDirectory(context.Background(), newPath)
 		if err != nil {
 			t.Fatal("failed to gracefully handle missing directory: ", err)
 		}
@@ -294,15 +294,13 @@ func TestDirectoryActions(t *testing.T) {
 		}
 	})
 	t.Run("Cleanup", func(t *testing.T) {
-		dir, err := filen.FindItem(context.Background(), "/abc", true)
+		dir, err := filen.FindDirectory(context.Background(), "/abc")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if dir, ok := dir.(*types.Directory); ok {
-			err := filen.TrashDirectory(context.Background(), dir)
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = filen.TrashDirectory(context.Background(), dir)
+		if err != nil {
+			t.Fatal(err)
 		}
 	})
 }

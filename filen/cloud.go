@@ -57,6 +57,21 @@ SegmentsLoop:
 	return nil, errors.New("unreachable")
 }
 
+func (api *Filen) FindDirectory(ctx context.Context, path string) (types.DirectoryInterface, error) {
+	item, err := api.FindItem(ctx, path, true)
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return nil, nil
+	}
+	directory, ok := item.(types.DirectoryInterface)
+	if !ok {
+		return nil, errors.New("not a directory")
+	}
+	return directory, nil
+}
+
 // FindDirectoryOrCreate finds a cloud directory by its path and returns its UUID.
 // If the directory cannot be found, it (and all non-existent parent directories) will be created.
 func (api *Filen) FindDirectoryOrCreate(ctx context.Context, path string) (types.DirectoryInterface, error) {
