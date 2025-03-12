@@ -456,6 +456,53 @@ func TestFileActions(t *testing.T) {
 	})
 }
 
+func TestPartialRead(t *testing.T) {
+	fileName := "partial_read.txt"
+
+	incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, fileName, "", time.Now(), time.Now(), &filen.BaseFolder)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	myString := "Sample!"
+	contents := make([]byte, sdk.ChunkSize+len(myString))
+	copy(contents[:], myString)
+	copy(contents[sdk.ChunkSize:], myString)
+
+	file, err := filen.UploadFile(context.Background(), incompleteFile, bytes.NewReader(contents))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader := filen.GetDownloadReaderWithOffset(context.Background(), file, 0, len(myString))
+
+	readBytes := make([]byte, sdk.ChunkSize*2)
+	n, err := reader.Read(readBytes)
+	if err != io.EOF && err != nil {
+		t.Fatal(err)
+	}
+
+	if string(readBytes[:n]) != myString {
+		t.Fatalf("Expected %s, got %s", myString, string(readBytes[:n]))
+	}
+
+	reader = filen.GetDownloadReaderWithOffset(context.Background(), file, sdk.ChunkSize, sdk.ChunkSize*2)
+	readBytes = make([]byte, sdk.ChunkSize*2)
+	n, err = reader.Read(readBytes)
+	if err != io.EOF && err != nil {
+		t.Fatal(err)
+	}
+
+	if string(readBytes[:n]) != myString {
+		t.Fatalf("Expected %s, got %s", myString, string(readBytes[:n]))
+	}
+
+	err = filen.TrashFile(context.Background(), *file)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func writeTestData(writer io.Writer, length int) error {
 	data := make([]byte, 0)
 	for i := 0; i < length; i++ {

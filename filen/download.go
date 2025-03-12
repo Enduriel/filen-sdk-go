@@ -95,40 +95,70 @@ func (c *chunkState) copyTo(ctx context.Context, out []byte, offset int, maxLeng
 
 // ChunkedReader implements io.Reader for sequential chunked file downloads
 type ChunkedReader struct {
-	file          *types.File
-	api           *Filen
-	buffer        []chunkState // Fixed-size circular buffer of chunks
-	chunkIndex    int          // Index of the current chunk being read
-	offsetInChunk int          // Current offset within the current chunk
-	ctx           context.Context
-	cancel        context.CancelCauseFunc
-	errOnce       *sync.Once
-	hasher        hash.Hash
+	file              *types.File
+	api               *Filen
+	buffer            []chunkState // Fixed-size circular buffer of chunks
+	chunkIndex        int          // Index of the current chunk being read
+	offsetInChunk     int          // Current offset within the current chunk
+	ctx               context.Context
+	cancel            context.CancelCauseFunc
+	errOnce           *sync.Once
+	hasher            hash.Hash
+	lastChunkIndex    int
+	lastOffsetInChunk int
+	totalRead         int // -1 if we started with an offset
 }
 
 // newChunkedReader creates a new ChunkedReader for sequential reading
-func newChunkedReader(ctx context.Context, api *Filen, file *types.File) *ChunkedReader {
+func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.File, offset int, limit int) *ChunkedReader {
+	if limit == -1 {
+		limit = file.Size
+	} else {
+		limit = min(limit, file.Size)
+	}
+
+	chunkIndex := 0
+	offsetInChunk := 0
+	totalRead := 0
+	if offset > 0 {
+		chunkIndex = offset / ChunkSize
+		offsetInChunk = offset % ChunkSize
+		totalRead = -1
+	}
+	lastChunkIndex := min(file.Chunks-1, limit/ChunkSize)
+	lastOffsetInChunk := file.Size % ChunkSize
+	if limit != -1 {
+		lastOffsetInChunk = limit % ChunkSize
+	}
+
 	ctx, cancel := context.WithCancelCause(ctx)
-	bufferSize := min(MaxBufferSize, file.Chunks)
+	bufferSize := min(MaxBufferSize, lastChunkIndex-chunkIndex+1)
 
 	reader := &ChunkedReader{
-		file:          file,
-		api:           api,
-		buffer:        make([]chunkState, bufferSize),
-		chunkIndex:    0,
-		offsetInChunk: 0,
-		ctx:           ctx,
-		cancel:        cancel,
-		errOnce:       &sync.Once{},
-		hasher:        sha512.New(),
+		file:              file,
+		api:               api,
+		buffer:            make([]chunkState, bufferSize),
+		chunkIndex:        chunkIndex,
+		offsetInChunk:     offsetInChunk,
+		ctx:               ctx,
+		cancel:            cancel,
+		errOnce:           &sync.Once{},
+		hasher:            sha512.New(),
+		lastChunkIndex:    lastChunkIndex,
+		lastOffsetInChunk: lastOffsetInChunk,
+		totalRead:         totalRead,
 	}
 
 	// Init and prefetch initial chunks
 	for i := 0; i < bufferSize; i++ {
 		reader.buffer[i].ctxMu = NewCtxMutex()
-		reader.goFetchChunk(i)
+		reader.goFetchChunk(i + chunkIndex)
 	}
 	return reader
+}
+
+func newChunkedReader(ctx context.Context, api *Filen, file *types.File) *ChunkedReader {
+	return newChunkedReaderWithOffset(ctx, api, file, 0, -1)
 }
 
 func (r *ChunkedReader) fetchChunk(c *chunkState, chunkIndex int) {
@@ -146,7 +176,7 @@ func (r *ChunkedReader) fetchChunk(c *chunkState, chunkIndex int) {
 }
 
 func (r *ChunkedReader) goFetchChunk(chunkIndex int) {
-	if chunkIndex >= r.file.Chunks {
+	if chunkIndex > r.lastChunkIndex {
 		return
 	}
 	bufferPos := chunkIndex % len(r.buffer)
@@ -178,15 +208,25 @@ func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 			// continue
 		}
 		// Check if we've reached EOF
-		if r.chunkIndex >= r.file.Chunks {
+		if r.chunkIndex > r.lastChunkIndex {
 			if read == 0 {
 				return 0, io.EOF
 			}
 			break
 		}
 
+		toRead := len(p) - read
+		if r.chunkIndex == r.lastChunkIndex {
+			toRead = min(toRead, r.lastOffsetInChunk-r.offsetInChunk)
+		}
+
 		currentChunk := &r.buffer[r.chunkIndex%len(r.buffer)]
-		copiedLen, err := currentChunk.copyTo(r.ctx, p[read:], r.offsetInChunk, len(p)-read)
+		copiedLen, err := currentChunk.copyTo(r.ctx, p[read:], r.offsetInChunk, toRead)
+
+		if r.totalRead != -1 {
+			r.totalRead += copiedLen
+		}
+
 		if err == io.EOF {
 			// this shouldn't really happen, but just in case
 			r.goFetchChunk(r.chunkIndex + len(r.buffer))
@@ -199,7 +239,7 @@ func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 		read += copiedLen
 		r.offsetInChunk += copiedLen
 		// Check if finished reading chunk
-		if r.offsetInChunk >= currentChunk.size {
+		if r.offsetInChunk >= currentChunk.size || (r.chunkIndex >= r.lastChunkIndex && r.offsetInChunk >= r.lastOffsetInChunk) {
 			r.goFetchChunk(r.chunkIndex + len(r.buffer))
 			r.offsetInChunk = 0
 			r.chunkIndex++
@@ -213,7 +253,7 @@ func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 func (r *ChunkedReader) Close() error {
 	r.cancel(fmt.Errorf("reader closed")) // Cancel all ongoing operations
 
-	if r.chunkIndex < r.file.Chunks {
+	if r.totalRead != r.file.Size {
 		// incomplete read
 		return nil
 	}

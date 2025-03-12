@@ -57,6 +57,10 @@ func (api *Filen) GetDownloadReader(ctx context.Context, file *types.File) io.Re
 	return newChunkedReader(ctx, api, file)
 }
 
+func (api *Filen) GetDownloadReaderWithOffset(ctx context.Context, file *types.File, offset int, limit int) io.ReadCloser {
+	return newChunkedReaderWithOffset(ctx, api, file, offset, limit)
+}
+
 func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
 	return api.UploadFile(ctx, file, r)
 }
