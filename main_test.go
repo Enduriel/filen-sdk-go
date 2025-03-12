@@ -326,7 +326,7 @@ func TestEmptyFileActions(t *testing.T) {
 	}
 
 	t.Run("Find", func(t *testing.T) {
-		foundObj, err := filen.FindItem(context.Background(), "empty.txt", false)
+		foundObj, err := filen.FindItem(context.Background(), "empty.txt")
 
 		if err != nil {
 			t.Fatal(err)
@@ -416,7 +416,7 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Find", func(t *testing.T) {
-		foundObj, err := filen.FindItem(context.Background(), fileName, false)
+		foundObj, err := filen.FindItem(context.Background(), fileName)
 		if err != nil {
 			t.Fatal(err)
 		}

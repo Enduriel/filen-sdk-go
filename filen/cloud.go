@@ -17,7 +17,7 @@ import (
 // FindItem find a cloud item by its path and returns it (either the File or the Directory will be returned).
 // Set requireDirectory to differentiate between files and directories with the same path (otherwise, the file will be found).
 // Returns nil for both File and Directory if none was found.
-func (api *Filen) FindItem(ctx context.Context, path string, requireDirectory bool) (types.FileSystemObject, error) {
+func (api *Filen) FindItem(ctx context.Context, path string) (types.FileSystemObject, error) {
 
 	var currentDir types.DirectoryInterface = &api.BaseFolder
 	segments := strings.Split(path, "/")
@@ -35,11 +35,9 @@ SegmentsLoop:
 		if err != nil {
 			return nil, fmt.Errorf("read directory: %w", err)
 		}
-		if !requireDirectory {
-			for _, file := range files {
-				if file.Name == segment {
-					return file, nil
-				}
+		for _, file := range files {
+			if file.Name == segment {
+				return file, nil
 			}
 		}
 		for _, directory := range directories {
@@ -58,7 +56,7 @@ SegmentsLoop:
 }
 
 func (api *Filen) FindDirectory(ctx context.Context, path string) (types.DirectoryInterface, error) {
-	item, err := api.FindItem(ctx, path, true)
+	item, err := api.FindItem(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +65,7 @@ func (api *Filen) FindDirectory(ctx context.Context, path string) (types.Directo
 	}
 	directory, ok := item.(types.DirectoryInterface)
 	if !ok {
-		return nil, errors.New("not a directory")
+		return nil, errors.New("is a file not a directory")
 	}
 	return directory, nil
 }
