@@ -3,15 +3,14 @@ package filen
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
-	"strings"
-	"time"
-
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/util"
 	"github.com/google/uuid"
+	"github.com/rclone/rclone/fs"
+	"strings"
+	"time"
 )
 
 // FindItem find a cloud item by its path and returns it (either the File or the Directory will be returned).
@@ -52,7 +51,7 @@ SegmentsLoop:
 		}
 		return nil, nil
 	}
-	return nil, errors.New("unreachable")
+	return nil, nil
 }
 
 func (api *Filen) FindDirectory(ctx context.Context, path string) (types.DirectoryInterface, error) {
@@ -65,7 +64,7 @@ func (api *Filen) FindDirectory(ctx context.Context, path string) (types.Directo
 	}
 	directory, ok := item.(types.DirectoryInterface)
 	if !ok {
-		return nil, errors.New("is a file not a directory")
+		return nil, fs.ErrorIsFile
 	}
 	return directory, nil
 }
