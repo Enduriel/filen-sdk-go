@@ -27,10 +27,12 @@ func setupEnv() error {
 
 	email := os.Getenv("TEST_EMAIL")
 	password := os.Getenv("TEST_PASSWORD")
-	if email == "" || password == "" {
-		return fmt.Errorf("TEST_EMAIL and TEST_PASSWORD environment variables must be set")
+	apiKey := os.Getenv("TEST_API_KEY")
+	if email == "" || password == "" || apiKey == "" {
+		return fmt.Errorf("TEST_EMAIL, TEST_PASSWORD, TEST_API_KEY environment variables must be set")
 	}
-	filen, err = sdk.New(context.Background(), email, password)
+	filen, err = sdk.NewWithAPIKey(context.Background(), email, password, apiKey)
+	//filen, err = sdk.New(context.Background(), email, password)
 	if err != nil {
 		panic(err)
 	}
