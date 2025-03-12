@@ -56,6 +56,23 @@ func NewIncompleteFileFromOSFile(authVersion int, osFile *os.File, parent Direct
 	return NewIncompleteFile(authVersion, filepath.Base(osFile.Name()), "", created, fileStat.ModTime(), parent)
 }
 
+func (file IncompleteFile) NewFromBase(authVersion int) (*IncompleteFile, error) {
+	key, err := crypto.MakeNewFileKey(authVersion)
+	if err != nil {
+		return nil, fmt.Errorf("make new file key: %w", err)
+	}
+
+	return &IncompleteFile{
+		UUID:          uuid.NewString(),
+		Name:          file.Name,
+		MimeType:      file.MimeType,
+		EncryptionKey: *key,
+		Created:       file.Created,
+		LastModified:  file.LastModified,
+		ParentUUID:    file.ParentUUID,
+	}, nil
+}
+
 // File represents a file on the cloud drive.
 type File struct {
 	IncompleteFile
