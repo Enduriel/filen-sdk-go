@@ -3,12 +3,15 @@ package filen_sdk_go
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/joho/godotenv"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -16,6 +19,7 @@ import (
 )
 
 var filen *sdk.Filen
+var baseTestDir *types.Directory
 
 func setupEnv() error {
 
@@ -34,7 +38,11 @@ func setupEnv() error {
 	filen, err = sdk.NewWithAPIKey(context.Background(), email, password, apiKey)
 	//filen, err = sdk.New(context.Background(), email, password)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	baseTestDir, err = filen.CreateDirectory(context.Background(), filen.BaseFolder, "go")
+	if err != nil {
+		return err
 	}
 	testPath := filepath.Join(".", "test_files")
 	err = os.MkdirAll(testPath, os.ModePerm)
@@ -52,6 +60,14 @@ func setupEnv() error {
 	return nil
 }
 
+func cleanupEnv() error {
+	err := filen.TrashDirectory(context.Background(), baseTestDir)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func TestMain(m *testing.M) {
 	// prep client
 	err := setupEnv()
@@ -61,6 +77,10 @@ func TestMain(m *testing.M) {
 
 	// run tests
 	code := m.Run()
+	err = cleanupEnv()
+	if err != nil {
+		panic(err)
+	}
 	os.Exit(code)
 }
 
@@ -68,11 +88,11 @@ func TestMain(m *testing.M) {
 // this is so the TS sdk can validate these files on its side and check if they are compatible
 // there should ideally be a TestDownloadsFromTSDir that validates files from the TS sdk
 func TestUploadsToGoDir(t *testing.T) {
-	goDir, err := filen.FindDirectoryOrCreate(context.Background(), "go")
+	goDir, err := filen.FindDirectoryOrCreate(context.Background(), "compat-go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testDir, err := filen.FindDirectory(context.Background(), "go/test")
+	testDir, err := filen.FindDirectory(context.Background(), "compat-go/dir")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,16 +102,7 @@ func TestUploadsToGoDir(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	_, err = filen.CreateDirectory(context.Background(), goDir, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	testFile, err := types.NewIncompleteFile(filen.AuthVersion, "hello.txt", "", time.Now(), time.Now(), goDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = filen.UploadFile(context.Background(), testFile, bytes.NewReader([]byte("Hello World From Go!")))
+	_, err = filen.CreateDirectory(context.Background(), goDir, "compat-go/dir")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,21 +110,84 @@ func TestUploadsToGoDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = filen.UploadFile(context.Background(), testEmptyFile, bytes.NewReader([]byte("")))
+	smallRandomBytes := make([]byte, 1024)
+	_, _ = rand.Read(smallRandomBytes)
+	_, err = filen.UploadFile(context.Background(), testEmptyFile, bytes.NewReader([]byte(hex.EncodeToString(smallRandomBytes))))
 	if err != nil {
 		t.Fatal(err)
 	}
-	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-20mb.txt", "", time.Now(), time.Now(), goDir)
+	testFile, err := types.NewIncompleteFile(filen.AuthVersion, "small.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	osFile, err := os.Open("test_files/large_sample-20mb.txt")
+	_, err = filen.UploadFile(context.Background(), testFile, bytes.NewReader([]byte("Hello World From Go!")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = filen.UploadFile(context.Background(), testBigFile, osFile)
+	bigRandomBytes := make([]byte, 1024*1024*4)
+	_, _ = rand.Read(bigRandomBytes)
+	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "big.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
+	}
+	_, err = filen.UploadFile(context.Background(), testBigFile, bytes.NewReader([]byte(hex.EncodeToString(bigRandomBytes))))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDownloadsFromTSDir(t *testing.T) {
+	tsDir, err := filen.FindDirectory(context.Background(), "compat-ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tsDir == nil {
+		fmt.Printf("WARNING: could not find compat-ts directory, skipping compatibility checks\n")
+		return
+	}
+
+	dir, err := filen.FindDirectory(context.Background(), "compat-ts/dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dir == nil {
+		t.Fatal("expected directory 'compat-ts/dir' to exist")
+	}
+
+	empty, err := filen.FindFile(context.Background(), "compat-ts/empty.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), empty))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(emptyBytes) != 0 {
+		t.Fatal("expected empty file to be empty")
+	}
+
+	small, err := filen.FindFile(context.Background(), "compat-ts/small.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	smallBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), small))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(smallBytes) != 1024*2 {
+		t.Fatal("expected small file to be 2048 bytes long")
+	}
+
+	big, err := filen.FindFile(context.Background(), "compat-ts/big.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bigBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), big))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bigBytes) != 1024*1024*4*2 {
+		t.Fatalf("expected big file to be 8MB, was instead %d bytes", len(bigBytes))
 	}
 }
 
@@ -123,17 +197,17 @@ func TestReadDirectories(t *testing.T) {
 
 	t.Run("setup", func(t *testing.T) {
 		var err error
-		def, err := filen.CreateDirectory(context.Background(), &filen.BaseFolder, "def")
+		def, err := filen.CreateDirectory(context.Background(), baseTestDir, "def")
 		if err != nil {
 			t.Fatal(err)
 		}
 		expectedDirs["def"] = def
-		uploads, err := filen.CreateDirectory(context.Background(), &filen.BaseFolder, "uploads")
+		uploads, err := filen.CreateDirectory(context.Background(), baseTestDir, "uploads")
 		if err != nil {
 			t.Fatal(err)
 		}
 		expectedDirs["uploads"] = uploads
-		incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), &filen.BaseFolder)
+		incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), baseTestDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +216,7 @@ func TestReadDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 		expectedFiles["large_sample-1mb.txt"] = largeSample
-		incompleteFile, err = types.NewIncompleteFile(filen.AuthVersion, "abc.txt", "", time.Now(), time.Now(), &filen.BaseFolder)
+		incompleteFile, err = types.NewIncompleteFile(filen.AuthVersion, "abc.txt", "", time.Now(), time.Now(), baseTestDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -164,7 +238,7 @@ func TestReadDirectories(t *testing.T) {
 	}
 
 	t.Run("Check", func(t *testing.T) {
-		files, dirs, err := filen.ReadDirectory(context.Background(), filen.BaseFolder)
+		files, dirs, err := filen.ReadDirectory(context.Background(), baseTestDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -179,7 +253,10 @@ func TestReadDirectories(t *testing.T) {
 		}
 
 		if len(requiredDirs) > 0 {
-			t.Fatalf("Missing directories: %v\n", requiredDirs)
+			for k, v := range requiredDirs {
+				fmt.Printf("%s: %#v\n", k, v)
+			}
+			t.Fatalf("Missing directories")
 		}
 
 		for _, file := range files {
@@ -312,7 +389,7 @@ func TestEmptyFileActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, filen.BaseFolder)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, baseTestDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +405,7 @@ func TestEmptyFileActions(t *testing.T) {
 	}
 
 	t.Run("Find", func(t *testing.T) {
-		foundObj, err := filen.FindItem(context.Background(), "empty.txt")
+		foundObj, err := filen.FindItem(context.Background(), "go/empty.txt")
 
 		if err != nil {
 			t.Fatal(err)
@@ -389,7 +466,7 @@ func TestFileActions(t *testing.T) {
 	fileName := "large_sample-20mb.txt"
 	osFile, err := os.Open("test_files/" + fileName)
 
-	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, filen.BaseFolder)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, baseTestDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,13 +495,9 @@ func TestFileActions(t *testing.T) {
 	})
 
 	t.Run("Find", func(t *testing.T) {
-		foundObj, err := filen.FindItem(context.Background(), fileName)
+		foundFile, err := filen.FindFile(context.Background(), path.Join("go", fileName))
 		if err != nil {
 			t.Fatal(err)
-		}
-		foundFile, ok := foundObj.(*types.File)
-		if !ok {
-			t.Fatal("File not found")
 		}
 		if !reflect.DeepEqual(file, foundFile) {
 			t.Fatalf("Uploaded \n%#v\n and Downloaded \n%#v\n file info did not match", file, foundFile)
@@ -461,7 +534,7 @@ func TestFileActions(t *testing.T) {
 func TestPartialRead(t *testing.T) {
 	fileName := "partial_read.txt"
 
-	incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, fileName, "", time.Now(), time.Now(), &filen.BaseFolder)
+	incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, fileName, "", time.Now(), time.Now(), baseTestDir)
 	if err != nil {
 		t.Fatal(err)
 	}
