@@ -107,7 +107,7 @@ func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash str
 
 	return &client.V3UploadDoneRequest{
 		V3UploadEmptyRequest: *emptyRequest,
-		Chunks:               (size / ChunkSize) + 1,
+		Chunks:               (size + ChunkSize - 1) / ChunkSize,
 		UploadKey:            fu.uploadKey,
 		Rm:                   crypto.GenerateRandomString(32),
 	}, nil
@@ -129,7 +129,7 @@ func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, s
 		Size:           size,
 		Region:         region,
 		Bucket:         bucket,
-		Chunks:         (size / ChunkSize) + 1,
+		Chunks:         uploadRequest.Chunks,
 		Hash:           fileHash,
 	}, nil
 }

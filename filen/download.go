@@ -131,6 +131,10 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 		lastOffsetInChunk = limit % ChunkSize
 	}
 
+	if lastOffsetInChunk == 0 && lastChunkIndex == file.Chunks-1 {
+		lastOffsetInChunk = ChunkSize
+	}
+
 	ctx, cancel := context.WithCancelCause(ctx)
 	bufferSize := min(MaxBufferSize, lastChunkIndex-chunkIndex+1)
 
