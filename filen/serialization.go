@@ -19,6 +19,7 @@ type SerializableFilen struct {
 	DEK            [32]byte
 	KEK            [32]byte
 	PrivateKey     []byte
+	HMACKey        [32]byte
 	BaseFolderUUID string
 }
 
@@ -35,6 +36,7 @@ func (api *Filen) serialize() *SerializableFilen {
 		DEK:            api.DEK.Bytes,
 		KEK:            api.KEK.Bytes,
 		PrivateKey:     x509.MarshalPKCS1PrivateKey(&api.PrivateKey),
+		HMACKey:        api.HMACKey,
 		BaseFolderUUID: api.BaseFolder.GetUUID(),
 	}
 }
@@ -79,6 +81,7 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 		KEK:         kek,
 		PrivateKey:  *privateKey,
 		PublicKey:   privateKey.PublicKey,
+		HMACKey:     s.HMACKey,
 		BaseFolder:  types.NewRootDirectory(s.BaseFolderUUID),
 	}, nil
 }
