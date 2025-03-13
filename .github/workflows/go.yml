@@ -19,6 +19,20 @@ jobs:
           go-version: '1.24'
       - name: Build
         run: go build -v ./...
+      - name: Debug Secret Names
+        run: |
+          echo "Requesting secret: ${{ format('{0}_TEST_ACC_EMAIL', matrix.version)}}"
+          echo "Requesting secret: ${{ format('{0}_TEST_ACC_PASSWORD', matrix.version) }}"
+          echo "Requesting secret: ${{ format('{0}_TEST_ACC_API_KEY', matrix.version) }}"
+      - name: Debug Environment Variables
+        run: |
+          echo "TEST_EMAIL is set: ${{ env.TEST_EMAIL != '' }}"
+          echo "TEST_PASSWORD is set: ${{ env.TEST_PASSWORD != '' }}"
+          echo "TEST_API_KEY is set: ${{ env.TEST_API_KEY != '' }}"
+        env:
+          TEST_EMAIL: ${{ secrets[format('{0}_TEST_ACC_EMAIL', matrix.version)] }}
+          TEST_PASSWORD: ${{ secrets[format('{0}_TEST_ACC_PASSWORD', matrix.version)] }}
+          TEST_API_KEY: ${{ secrets[format('{0}_TEST_ACC_API_KEY', matrix.version)] }}
       - name: Test
         env:
           TEST_EMAIL: ${{ secrets[format('{0}_TEST_ACC_EMAIL', matrix.version)] }}
