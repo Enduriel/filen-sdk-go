@@ -54,6 +54,21 @@ SegmentsLoop:
 	return nil, nil
 }
 
+func (api *Filen) FindFile(ctx context.Context, path string) (*types.File, error) {
+	item, err := api.FindItem(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return nil, nil
+	}
+	file, ok := item.(*types.File)
+	if !ok {
+		return nil, fs.ErrorIsDir
+	}
+	return file, nil
+}
+
 func (api *Filen) FindDirectory(ctx context.Context, path string) (types.DirectoryInterface, error) {
 	item, err := api.FindItem(ctx, path)
 	if err != nil {
