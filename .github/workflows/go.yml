@@ -1,0 +1,27 @@
+name: Go
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        version: [V2, V3]  # This remains to define which version of the secrets to use
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+      - name: Build
+        run: go build -v ./...
+      - name: Test
+        env:
+          TEST_EMAIL: ${{ format('{0}_TEST_ACC_EMAIL', secrets[matrix.version]) }}
+          TEST_PASSWORD: ${{ format('{0}_TEST_ACC_PASSWORD', secrets[matrix.version]) }}
+          TEST_API_KEY: ${{ format('{0}_TEST_ACC_API_KEY', secrets[matrix.version]) }}
+        run: go test -v ./...
