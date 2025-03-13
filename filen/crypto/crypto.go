@@ -8,13 +8,16 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/pbkdf2"
 	"slices"
 	"strings"
@@ -393,4 +396,24 @@ func RSAKeyPairFromStrings(privKey string, pubKey string) (*rsa.PrivateKey, *rsa
 	}
 
 	return privateKey, publicKey, nil
+}
+
+type HMACKey [32]byte
+
+func MakeHMACKey(privateKey *rsa.PrivateKey) HMACKey {
+	key := HMACKey{}
+	derivedKey := hkdf.New(sha256.New, privateKey.D.Bytes(), nil, []byte("hmac-sha256-key"))
+	_, err := derivedKey.Read(key[:])
+	if err != nil {
+		// this should never happen
+		// we do not read enough from the hkdf for it to be an issue
+		panic("error generating hkdf key: " + err.Error())
+	}
+	return key
+}
+
+func (h HMACKey) Hash(data []byte) string {
+	hasher := hmac.New(sha256.New, h[:])
+	hasher.Write(data)
+	return hex.EncodeToString(hasher.Sum(nil))
 }

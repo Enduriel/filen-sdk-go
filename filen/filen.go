@@ -27,6 +27,8 @@ type Filen struct {
 	PrivateKey rsa.PrivateKey
 	PublicKey  rsa.PublicKey
 
+	HMACKey crypto.HMACKey
+
 	// BaseFolderUUID is the UUID of the cloud drive's root directory
 	BaseFolder types.RootDirectory
 }
@@ -226,6 +228,7 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		PublicKey:   *publicKey,
 		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
 		AuthVersion: info.AuthVersion,
+		HMACKey:        crypto.MakeHMACKey(privateKey),
 	}, nil
 }
 
